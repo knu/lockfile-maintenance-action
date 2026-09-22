@@ -6,6 +6,17 @@ By default, all supported lockfiles in the repository, including subdirectories,
 
 The Action creates or updates a pull request by default, committing only the selected lockfiles.  Set `create-pull-request: false` to update files without committing or opening a PR.  Run project tests in the consuming repository's PR CI.
 
+## Why use this alongside Renovate?
+
+Renovate's `minimumReleaseAge` controls proposed dependency updates, but lockfile maintenance delegates resolution to a package manager.  Newly resolved transitive dependencies need a resolver-level age policy too.  [Renovate documents this distinction](https://docs.renovatebot.com/key-concepts/minimum-release-age/).
+
+- **Cargo cooldown support:** as of September 2026, [Renovate's Cargo maintenance command](https://github.com/renovatebot/renovate/blob/main/lib/modules/manager/cargo/artifacts.ts) does not pass its minimum release age to Cargo.  This Action supplies Cargo's native publish-age setting using a pinned nightly toolchain.
+- **Maintenance independent of Renovate's status checks:** we have [observed a maintenance PR](https://github.com/knu/vscode-easy-kill/pull/28) remain pending on `renovate/stability-days` even though every locked version met the configured age at the PR's last update.  The cause was not established.  This Action applies the age policy during resolution and creates its own PR, without waiting for that Renovate status.  Do not require `renovate/stability-days` globally in branch protection; keep normal review and PR CI requirements.
+- **One workflow for six tools:** select Git-tracked Cargo, npm, pnpm, Yarn, uv, and Bundler lockfiles with path patterns.  Review per-file version changes, including transitive dependencies, in the PR body.
+- **No repository secrets with the App:** install the [Lockfile Maintenance App](https://github.com/apps/lockfile-maintenance) and use OIDC.  App-authored PRs trigger the repository's CI and can join its existing dependency merge queue.
+
+Renovate already forwards age limits to npm and Poetry; it is not missing this integration for every manager.  This Action also supports npm and fails rather than retrying without its cutoff.  Keep Renovate for manifest updates and security alerts, and disable its lockfile maintenance only for the lockfiles delegated here.  Native package/source exceptions still apply; see [release-age behavior](#release-age-behavior).
+
 ## Usage
 
 ``` yaml
@@ -57,6 +68,8 @@ See [the Cargo workflow](examples/cargo-maintenance.yml) and [the multi-tool wor
 | Yarn | `yarn.lock` | `package.json` | Install Yarn >=4.10 before use |
 | uv | `uv.lock` | `pyproject.toml` | Install uv >=0.9.17 before use |
 | Bundler | `Gemfile.lock` | `Gemfile` | Install Bundler >=4.0.18 before use |
+
+Yarn support uses the modern Yarn `npmMinimalAgeGate` setting and is tested with Yarn 4.  Yarn Classic (1.x) and Yarn versions below 4.10 are not supported.
 
 Each manifest must be in the same directory as its lockfile.  Select workspace-root lockfiles for package-manager workspaces.  Selecting multiple npm, pnpm, or Yarn lockfiles for the same manifest is an error.  npm shrinkwrap and Poetry lockfiles are not supported.  A sibling `npm-shrinkwrap.json` prevents npm maintenance because it takes precedence over `package-lock.json`.
 
