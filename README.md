@@ -1,6 +1,6 @@
 # Lockfile Maintenance Action for GitHub Actions
 
-This Action updates Git-tracked lockfiles using Cargo, pnpm, Yarn, uv, or Bundler, with a minimum release age passed to each tool's dependency resolver.  It selects the tool from the lockfile name and updates dependencies within the existing manifest constraints.
+This Action updates Git-tracked lockfiles using Cargo, npm, pnpm, Yarn, uv, or Bundler, with a minimum release age passed to each tool's dependency resolver.  It selects the tool from the lockfile name and updates dependencies within the existing manifest constraints.
 
 By default, all supported lockfiles in the repository, including subdirectories, are selected.  Use gitignore-style patterns to limit the selection.  Untracked files are never selected.
 
@@ -52,12 +52,13 @@ See [the Cargo workflow](examples/cargo-maintenance.yml) and [the multi-tool wor
 | Tool | Lockfile | Required manifest | Setup |
 | --- | --- | --- | --- |
 | Cargo | `Cargo.lock` | `Cargo.toml` | Requires `rustup`; installs `nightly-2026-09-10` if absent |
+| npm | `package-lock.json` | `package.json` | Requires npm >=11.10, available with the Action's Node.js 24 runtime |
 | pnpm | `pnpm-lock.yaml` | `package.json` | Install pnpm >=11 before use |
 | Yarn | `yarn.lock` | `package.json` | Install Yarn >=4.10 before use |
 | uv | `uv.lock` | `pyproject.toml` | Install uv >=0.9.17 before use |
 | Bundler | `Gemfile.lock` | `Gemfile` | Install Bundler >=4.0.18 before use |
 
-Each manifest must be in the same directory as its lockfile.  Select workspace-root lockfiles for package-manager workspaces.  Selecting both pnpm and Yarn lockfiles for the same manifest is an error.  npm and Poetry lockfiles are not supported.
+Each manifest must be in the same directory as its lockfile.  Select workspace-root lockfiles for package-manager workspaces.  Selecting multiple npm, pnpm, or Yarn lockfiles for the same manifest is an error.  npm shrinkwrap and Poetry lockfiles are not supported.  A sibling `npm-shrinkwrap.json` prevents npm maintenance because it takes precedence over `package-lock.json`.
 
 The Action sets up Node.js 24 for its own runtime and installs its runtime dependencies in a temporary directory, reusing an npm download cache.  Cargo uses the pinned nightly without changing the default Rust toolchain.
 
@@ -112,6 +113,7 @@ The Action sets up Node.js 24 for its own runtime and installs its runtime depen
   ``` yaml
   files: |
     Cargo.lock
+    package-lock.json
     pnpm-lock.yaml
     yarn.lock
     uv.lock
@@ -209,6 +211,8 @@ OIDC identifies the workflow, not this composite Action or its version.  Treat t
 ## Release-age behavior
 
 The age setting uses each tool's native policy, including its package and source exceptions.  It is not a universal timestamp check: Git dependencies and Cargo/Bundler registry entries without publish timestamps are not covered.  Named Cargo registries and uv package/index settings can override the general age policy.  Bundler may retain already locked young gems, while Cargo may downgrade them.
+
+npm regenerates `package-lock.json` with `npm update --package-lock-only --ignore-scripts --before=<cutoff>`, where the cutoff is the current time minus `minimum-release-age`.  Using `update` also refreshes dependencies when `node_modules` already exists.  It does not retry without the cutoff when resolution fails.  npm's native source and package exceptions, including `min-release-age-exclude`, still apply.  The CLI cutoff overrides `.npmrc` age settings; set the Action input to the policy you want enforced.  Version reports read lockfile formats 1, 2, and 3; regeneration uses npm's configured output format.
 
 Matching no supported lockfiles, missing manifests, and unsupported tool versions are errors.  If an update fails or changes a protected manifest, configuration, or unselected lockfile, the Action attempts to restore the original files.  Package-manager caches and other generated files are not rolled back.
 

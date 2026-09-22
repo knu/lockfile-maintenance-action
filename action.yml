@@ -32,10 +32,11 @@ inputs:
       Only Git-tracked files with supported lockfile names are considered.
       By default, selects all supported Git-tracked lockfiles, including subdirectories.
       Symlinks are not followed.
-      Matching no lockfiles is an error. Set up pnpm >=11, Yarn >=4.10,
+      Matching no lockfiles is an error. Requires npm >=11.10; set up pnpm >=11, Yarn >=4.10,
       uv >=0.9.17, or Bundler >=4.0.18 before use; Cargo installs a pinned nightly.
     default: |
       Cargo.lock
+      package-lock.json
       pnpm-lock.yaml
       yarn.lock
       uv.lock

@@ -9,6 +9,37 @@ import { command } from './command.js';
 export async function packageVersions(manager, contents, context) {
   let packages;
   switch (manager) {
+    case 'npm': {
+      const data = JSON.parse(contents);
+      if (![1, 2, 3].includes(data.lockfileVersion))
+        throw new Error('unsupported npm lockfileVersion');
+      if (data.lockfileVersion === 1) {
+        const collect = (dependencies) =>
+          Object.entries(dependencies ?? {}).flatMap(([name, value]) => {
+            let version = value.version;
+            if (version?.startsWith('npm:')) {
+              const separator = version.lastIndexOf('@');
+              name = version.slice(4, separator);
+              version = version.slice(separator + 1);
+            }
+            return [[name, version], ...collect(value.dependencies)];
+          });
+        packages = collect(data.dependencies);
+      } else {
+        if (!data.packages) throw new Error('missing npm packages');
+        packages = Object.entries(data.packages)
+          .filter(
+            ([location, value]) =>
+              !value.link &&
+              (location.startsWith('node_modules/') || location.includes('/node_modules/')),
+          )
+          .map(([location, value]) => [
+            value.name ?? location.slice(location.lastIndexOf('node_modules/') + 13),
+            value.version,
+          ]);
+      }
+      break;
+    }
     case 'cargo':
     case 'uv': {
       const data = parseToml(contents);

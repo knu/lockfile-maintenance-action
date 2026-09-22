@@ -194,3 +194,53 @@ test('classifies release components, downgrades, and non-SemVer or ambiguous cha
   ])
     assert.equal(changeType(from, to), expected, `${from} -> ${to}`);
 });
+
+for (const lockfileVersion of [2, 3]) {
+  test(`npm v${lockfileVersion} handles aliases, nested versions and workspace links`, async () => {
+    const versions = await packageVersions(
+      'npm',
+      JSON.stringify({
+        lockfileVersion,
+        packages: {
+          '': { name: 'root', version: '1.0.0' },
+          'node_modules/example': { version: '1.2.0' },
+          'node_modules/parent/node_modules/example': { version: '1.1.0' },
+          'node_modules/@scope/example': { version: '2.0.0' },
+          'node_modules/alias': { name: '@scope/original', version: '3.0.0' },
+          'node_modules/local': { resolved: 'packages/local', link: true },
+          'packages/local': { name: 'local', version: '1.0.0' },
+          'packages/local/node_modules/example': { version: '1.2.0' },
+        },
+      }),
+    );
+    assert.deepEqual(
+      [...versions],
+      [
+        ['example', new Set(['1.2.0', '1.1.0'])],
+        ['@scope/example', new Set(['2.0.0'])],
+        ['@scope/original', new Set(['3.0.0'])],
+      ],
+    );
+  });
+}
+
+test('npm v1 handles nested dependencies and aliases', async () => {
+  const versions = await packageVersions(
+    'npm',
+    JSON.stringify({
+      lockfileVersion: 1,
+      dependencies: {
+        example: { version: '1.2.0', dependencies: { example: { version: '1.1.0' } } },
+        alias: { version: 'npm:@scope/original@3.0.0' },
+      },
+    }),
+  );
+  assert.deepEqual(
+    [...versions],
+    [
+      ['example', new Set(['1.2.0', '1.1.0'])],
+      ['@scope/original', new Set(['3.0.0'])],
+    ],
+  );
+  await assert.rejects(packageVersions('npm', '{}'), /lockfileVersion/);
+});

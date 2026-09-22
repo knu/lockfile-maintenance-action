@@ -1,5 +1,5 @@
 # Copy to the consuming repository's .github/workflows/ directory.
-# This example updates Cargo, pnpm, Yarn, uv and Bundler projects in one checkout.
+# This example updates Cargo, npm, pnpm, Yarn, uv and Bundler projects in one checkout.
 # Install the versions your projects require; the versions below are tested examples.
 # Each selected lockfile must have its manifest in the same directory.
 # Select workspace-root lockfiles, not lockfiles inside individual workspace members.
@@ -14,7 +14,7 @@
 # literal leading # or ! with a backslash. Blank lines are ignored.
 # Only Git-tracked lockfiles are selected.
 # No matching lockfile, missing manifests, old/missing tools, or conflicting
-# pnpm/Yarn lockfiles for the same package.json cause an error.
+# npm/pnpm/Yarn lockfiles for the same package.json cause an error.
 # The Action returns JSON arrays of checkout-relative paths in lockfiles and
 # changed-lockfiles. It restores lockfiles/manifests on a failed update.
 # It creates or updates a maintenance PR by default; run project tests in PR CI.
@@ -79,6 +79,7 @@ jobs:
           files: |
             Cargo.lock
             pnpm-lock.yaml
+            package-lock.json
             yarn.lock
             uv.lock
             Gemfile.lock

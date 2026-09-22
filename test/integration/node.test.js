@@ -6,8 +6,9 @@ import path from 'node:path';
 import test from 'node:test';
 import { main, run, temporaryDirectory, trackFiles } from '../helpers.js';
 
-for (const manager of ['pnpm', 'yarn']) {
-  test(`real ${manager} excludes young direct and scoped transitive versions`, async (t) => {
+for (const scenario of ['npm', 'npm-installed', 'pnpm', 'yarn']) {
+  const manager = scenario === 'npm-installed' ? 'npm' : scenario;
+  test(`real ${scenario} excludes young direct and scoped transitive versions`, async (t) => {
     const directory = await temporaryDirectory(t);
     const workspace = path.join(directory, 'checkout');
     await mkdir(workspace);
@@ -102,6 +103,9 @@ for (const manager of ['pnpm', 'yarn']) {
       YARN_GLOBAL_FOLDER: path.join(directory, 'yarn-global'),
       YARN_ENABLE_IMMUTABLE_INSTALLS: 'false',
       YARN_ENABLE_SCRIPTS: 'false',
+      npm_config_cache: path.join(directory, 'npm-cache'),
+      npm_config_audit: 'false',
+      npm_config_fund: 'false',
       GITHUB_WORKSPACE: workspace,
       GITHUB_OUTPUT: path.join(directory, 'output'),
       'INPUT_MINIMUM-RELEASE-AGE': '3 days',
@@ -109,13 +113,20 @@ for (const manager of ['pnpm', 'yarn']) {
     };
     const generated = await run(
       manager,
-      manager === 'pnpm'
-        ? ['install', '--lockfile-only', '--ignore-scripts']
-        : ['install', '--mode=update-lockfile'],
+      {
+        npm: [
+          'install',
+          ...(scenario === 'npm-installed' ? [] : ['--package-lock-only']),
+          '--ignore-scripts',
+        ],
+        pnpm: ['install', '--lockfile-only', '--ignore-scripts'],
+        yarn: ['install', '--mode=update-lockfile'],
+      }[manager],
       {
         cwd: workspace,
         env: {
           ...env,
+          npm_config_cache: path.join(directory, 'initial-npm-cache'),
           pnpm_config_cache_dir: path.join(directory, 'initial-pnpm-cache'),
           YARN_GLOBAL_FOLDER: path.join(directory, 'initial-yarn-global'),
         },
@@ -129,7 +140,9 @@ for (const manager of ['pnpm', 'yarn']) {
     assert.equal(result.code, 0, result.stderr + result.stdout);
     const report = await readFile(env.LOCKFILE_REPORT_PATH, 'utf8');
     assert.match(report, /<code>1\.0\.0<\/code> \| <code>1\.1\.0<\/code>/);
-    const lockfile = manager === 'pnpm' ? 'pnpm-lock.yaml' : 'yarn.lock';
+    const lockfile = { npm: 'package-lock.json', pnpm: 'pnpm-lock.yaml', yarn: 'yarn.lock' }[
+      manager
+    ];
     const updated = await readFile(path.join(workspace, lockfile), 'utf8');
     assert.match(updated, /1\.1\.0/);
     assert.doesNotMatch(updated, /1\.2\.0/);

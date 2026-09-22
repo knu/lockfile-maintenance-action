@@ -2,8 +2,18 @@ import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import { command, requireVersion } from '../command.js';
 import { prepareCargo, updateCargo } from './cargo.js';
+import { prepareNpm, updateNpm } from './npm.js';
 
 export const managers = new Map([
+  [
+    'package-lock.json',
+    {
+      name: 'npm',
+      manifest: 'package.json',
+      prepare: prepareNpm,
+      update: updateNpm,
+    },
+  ],
   [
     'Cargo.lock',
     {

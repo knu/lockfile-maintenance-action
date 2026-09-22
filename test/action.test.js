@@ -5,6 +5,7 @@ import test from 'node:test';
 import { main, project, run, temporaryDirectory, trackFiles } from './helpers.js';
 
 const tools = {
+  npm: ['package-lock.json', 'package.json', '11.19.0'],
   rustup: ['Cargo.lock', 'Cargo.toml', '1.100.0'],
   pnpm: ['pnpm-lock.yaml', 'package.json', '12.4.2'],
   yarn: ['yarn.lock', 'package.json', '4.18.0'],
@@ -98,17 +99,24 @@ test('selects lockfiles by ordered patterns, with exclusions, reinclusion and sp
   );
 });
 
-test('auto-selects all five tools and rounds up age for each native unit', async (t) => {
+test('auto-selects all six tools and rounds up age for each native unit', async (t) => {
   const f = await fixture(t);
-  for (const tool of ['pnpm', 'yarn', 'uv', 'bundle']) await f.add(tool, tool);
+  for (const tool of ['npm', 'pnpm', 'yarn', 'uv', 'bundle']) await f.add(tool, tool);
+  const started = Date.now();
   const result = await f.invoke({ 'INPUT_MINIMUM-RELEASE-AGE': '86401 seconds' });
   assert.equal(result.code, 0, result.stderr);
   const output = await outputs(f.output);
-  assert.equal(output.lockfiles.length, 5);
-  assert.equal(output['changed-lockfiles'].length, 5);
+  assert.equal(output.lockfiles.length, 6);
+  assert.equal(output['changed-lockfiles'].length, 6);
   const calls = (await readFile(f.log, 'utf8')).trim().split('\n').map(JSON.parse);
   const update = (tool) =>
     calls.find((call) => call.tool === tool && !call.args.includes('--version'));
+  const cutoff = Date.parse(
+    update('npm')
+      .args.find((arg) => arg.startsWith('--before='))
+      .slice(9),
+  );
+  assert.ok(cutoff >= started - 86401000 && cutoff <= Date.now() - 86401000);
   assert.ok(update('pnpm').args.includes('--config.minimum-release-age=1441'));
   assert.ok(update('pnpm').args.includes('--config.minimum-release-age-strict=true'));
   assert.equal(update('yarn').age, '1441');
@@ -298,6 +306,20 @@ test('rejects multiple package managers for the same manifest', async (t) => {
   assert.equal(result.code, 1);
   assert.match(result.stderr, /multiple package managers/);
   await assert.rejects(readFile(f.log), { code: 'ENOENT' });
+});
+
+test('rejects npm shrinkwrap before modifying any lockfiles', async (t) => {
+  const f = await fixture(t);
+  await f.add('npm', 'npm');
+  await writeFile(path.join(f.workspace, 'npm/npm-shrinkwrap.json'), '{}\n');
+  const result = await f.invoke();
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /npm-shrinkwrap.json takes precedence/);
+  assert.equal(
+    await readFile(path.join(f.workspace, 'npm/package-lock.json'), 'utf8'),
+    'original\n',
+  );
+  assert.equal(await readFile(path.join(f.workspace, 'Cargo.lock'), 'utf8'), 'version = 4\n');
 });
 
 test('requires a matching lockfile and its manifest', async (t) => {
