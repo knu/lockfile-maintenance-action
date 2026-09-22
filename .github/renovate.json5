@@ -4,6 +4,8 @@
   timezone: 'Asia/Tokyo',
   schedule: ['after 9am on friday', 'before 6pm on friday'],
   labels: ['dependencies'],
+  // Lockfiles are maintained by lockfile-maintenance-action.
+  lockFileMaintenance: { enabled: false },
   packageRules: [
     {
       matchManagers: ['github-actions'],
