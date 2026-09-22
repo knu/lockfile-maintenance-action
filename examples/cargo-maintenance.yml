@@ -1,0 +1,41 @@
+# Copy to the consuming repository's .github/workflows/ directory.
+# Configure LOCKFILE_MAINTENANCE_TOKEN as a GitHub App token or fine-grained PAT
+# with contents and pull-requests write access to run PR CI without GITHUB_TOKEN's approval gate.
+# The Action updates Cargo.lock and creates or updates a maintenance PR.
+# It installs a pinned nightly Cargo via rustup if absent, without changing the default toolchain.
+# Cargo may downgrade a recently locked version to meet the age policy.
+# Git dependencies and registry entries without pubtime are not age-checked.
+# Named registries can override the global age through their own Cargo configuration.
+name: Lockfile maintenance
+
+on:
+  schedule:
+    - cron: '17 0 * * 5' # Friday 09:17 JST
+  workflow_dispatch:
+
+concurrency:
+  group: lockfile-maintenance
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Update dependencies
+        id: maintenance
+        uses: knu/lockfile-maintenance-action@v1 # zizmor: ignore[unpinned-uses] -- Follow the v1 release series in this example.
+        with:
+          files: /Cargo.lock
+          minimum-release-age: 3 days
+          token: ${{ secrets.LOCKFILE_MAINTENANCE_TOKEN }}

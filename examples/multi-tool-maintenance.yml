@@ -1,0 +1,91 @@
+# Copy to the consuming repository's .github/workflows/ directory.
+# This example updates Cargo, pnpm, Yarn, uv and Bundler projects in one checkout.
+# Install the versions your projects require; the versions below are tested examples.
+# Each selected lockfile must have its manifest in the same directory.
+# Select workspace-root lockfiles, not lockfiles inside individual workspace members.
+# files is relative to working-directory (the checkout by default):
+#   Cargo.lock        matches the basename anywhere
+#   /Cargo.lock       matches only the root
+#   services/**       includes supported lockfiles below services
+#   !vendor/          excludes vendor directories anywhere
+#   vendor/demo/      re-includes supported lockfiles below vendor/demo
+# Rules run in order. Unlike gitignore's traversal rules, a later inclusion may
+# re-include a file below an excluded directory. # starts a comment; escape a
+# literal leading # or ! with a backslash. Blank lines are ignored.
+# Only Git-tracked lockfiles are selected.
+# No matching lockfile, missing manifests, old/missing tools, or conflicting
+# pnpm/Yarn lockfiles for the same package.json cause an error.
+# The Action returns JSON arrays of checkout-relative paths in lockfiles and
+# changed-lockfiles. It restores lockfiles/manifests on a failed update.
+# It creates or updates a maintenance PR by default; run project tests in PR CI.
+# Set create-pull-request: false to only update files in the checkout.
+# Package-manager caches and other generated files are not rolled back.
+# Native package/source exceptions remain effective. Cargo/Git dependencies and
+# missing timestamps in Cargo/Bundler are not covered by the global age setting.
+# Bundler may preserve already locked young gems. uv has per-package/index overrides.
+# Use trusted project manifests/configuration: Gemfiles, Yarn plugins and uv
+# workspace metadata can execute code even when install scripts are disabled.
+name: Multi-tool lockfile maintenance
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: lockfile-maintenance
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - uses: ruby/setup-ruby@a0102e0972be65f351c307e2d64b9314a57c8073 # v1.324.0
+        with:
+          ruby-version: '4.0'
+          bundler: '4.0.21'
+
+      - name: Set up package managers
+        run: | # zizmor: ignore[adhoc-packages] -- Example pins standalone CLIs; use your project's locked tool setup.
+          npm install --prefix .tmp/tools --ignore-scripts pnpm@12.4.2 @yarnpkg/cli-dist@4.18.0
+          node .tmp/tools/node_modules/pnpm/install.js
+          python3 -m venv .tmp/tools/python
+          .tmp/tools/python/bin/pip install uv==0.12.17
+          echo "$PWD/.tmp/tools/node_modules/.bin" >> "$GITHUB_PATH"
+          echo "$PWD/.tmp/tools/python/bin" >> "$GITHUB_PATH"
+
+      - name: Update selected lockfiles
+        id: maintenance
+        uses: knu/lockfile-maintenance-action@v1 # zizmor: ignore[unpinned-uses] -- Follow the v1 release series in this example.
+        with:
+          minimum-release-age: 3 days
+          token: ${{ secrets.LOCKFILE_MAINTENANCE_TOKEN }}
+          files: |
+            Cargo.lock
+            pnpm-lock.yaml
+            yarn.lock
+            uv.lock
+            Gemfile.lock
+            !vendor/
+            !fixtures/
+
+      - name: Show changed lockfiles
+        env:
+          CHANGED_LOCKFILES: ${{ steps.maintenance.outputs.changed-lockfiles }}
+        run: printf '%s\n' "$CHANGED_LOCKFILES" | jq .

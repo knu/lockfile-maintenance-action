@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <title>Lockfile Maintenance</title>
+  <defs>
+    <mask id="keyhole" maskUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+      <rect width="128" height="128" fill="white"/>
+      <circle cx="64" cy="91" r="7" fill="black"/>
+      <path d="M64 93v10" fill="none" stroke="black" stroke-width="8" stroke-linecap="round"/>
+    </mask>
+  </defs>
+  <g fill="#58d4af">
+    <path d="M32 6h45v23a10 10 0 0 0 10 10h21v71a12 12 0 0 1-12 12H32a12 12 0 0 1-12-12V18A12 12 0 0 1 32 6Z"/>
+    <path d="M85 7v21a3 3 0 0 0 3 3h20Z"/>
+  </g>
+  <rect x="32" y="73" width="64" height="44" rx="9" fill="#1f2328" mask="url(#keyhole)"/>
+  <g fill="none" stroke="#1f2328" stroke-linejoin="round">
+    <path d="M46 78V58a18 18 0 0 1 36 0v6" stroke-width="15"/>
+    <path d="M66 60h32L82 82Z" fill="#1f2328" stroke-width="6"/>
+  </g>
+  <path d="M46 78V58a18 18 0 0 1 36 0v6" fill="none" stroke="#f5b342" stroke-width="9"/>
+  <path d="M66 60h32L82 82Z" fill="#f5b342"/>
+</svg>

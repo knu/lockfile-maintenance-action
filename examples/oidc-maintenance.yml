@@ -1,0 +1,33 @@
+# The broker must be deployed and authorize this repository/workflow before use.
+# Install the Lockfile Maintenance GitHub App on the repository first.
+name: Lockfile maintenance
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: lockfile-maintenance
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Update lockfile and create a pull request
+        uses: knu/lockfile-maintenance-action@v1 # zizmor: ignore[unpinned-uses] -- Follow the v1 release series in this example.
+        with:
+          auth: oidc
+          files: /Cargo.lock
+          minimum-release-age: 3 days

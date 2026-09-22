@@ -1,0 +1,163 @@
+name: Lockfile maintenance
+description: Update selected lockfiles with native minimum release ages and create a pull request.
+author: Akinori MUSHA
+branding:
+  icon: refresh-cw
+  color: green
+
+inputs:
+  create-pull-request:
+    description: Create or update a PR. Set to false to only update files in the checkout.
+    default: 'true'
+  auth:
+    description: Authentication mode (token or oidc). OIDC requires id-token write permission and broker authorization.
+    default: token
+  token:
+    description: Token for checkout and PR creation. Requires contents read access, plus contents and pull-requests write access for PR creation.
+    default: ${{ github.token }}
+  branch:
+    description: Branch for the maintenance PR. Use a different branch for each independent file selection.
+    default: automation/lockfile-maintenance
+  base:
+    description: Target branch for the PR and automatic checkout. An existing checkout is preserved.
+    default: ${{ github.event.repository.default_branch }}
+  labels:
+    description: Comma or newline-separated labels for the PR.
+    default: dependencies
+  files:
+    description: >-
+      Newline-separated gitignore-style patterns relative to working-directory.
+      Positive patterns include lockfiles; ! excludes; the last matching line wins.
+      Supports *, **, / anchors, directory patterns, # comments, and backslash escapes.
+      Only Git-tracked files with supported lockfile names are considered.
+      By default, selects all supported Git-tracked lockfiles, including subdirectories.
+      Symlinks are not followed.
+      Matching no lockfiles is an error. Set up pnpm >=11, Yarn >=4.10,
+      uv >=0.9.17, or Bundler >=4.0.18 before use; Cargo installs a pinned nightly.
+    default: |
+      Cargo.lock
+      pnpm-lock.yaml
+      yarn.lock
+      uv.lock
+      Gemfile.lock
+  minimum-release-age:
+    description: >-
+      Positive integer and plural unit (seconds, minutes, hours, days, weeks, months).
+      Months mean 30 days. Rounded up to minutes for pnpm/Yarn and days for Bundler.
+      Passed to native resolvers; their source/package exceptions and missing-timestamp
+      behavior still apply. Git dependencies are not age-checked.
+    default: 3 days
+  working-directory:
+    description: Root for file patterns, relative to the checkout.
+    default: .
+
+outputs:
+  pull-request-number:
+    description: Number of the maintenance PR, or empty when none exists or PR creation is disabled.
+    value: ${{ steps.pull-request.outputs.pull-request-number }}
+  pull-request-url:
+    description: URL of the maintenance PR, or empty when none exists or PR creation is disabled.
+    value: ${{ steps.pull-request.outputs.pull-request-url }}
+  changed:
+    description: Whether any selected lockfile changed (true or false).
+    value: ${{ steps.maintenance.outputs.changed }}
+  lockfiles:
+    description: JSON array of selected lockfile paths relative to the checkout.
+    value: ${{ steps.maintenance.outputs.lockfiles }}
+  changed-lockfiles:
+    description: JSON array of changed lockfile paths relative to the checkout.
+    value: ${{ steps.maintenance.outputs.changed-lockfiles }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '24'
+        package-manager-cache: false
+
+    - name: Prepare Action runtime
+      id: runtime
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: node "$ACTION_PATH/scripts/setup.js"
+
+    - name: Cache Action dependencies
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/lockfile-maintenance-npm-cache
+        key: lockfile-maintenance-npm-${{ runner.os }}-${{ runner.arch }}-${{ steps.runtime.outputs.lock-hash }}
+
+    - name: Install Action dependencies
+      shell: bash
+      env:
+        ACTION_DIRECTORY: ${{ steps.runtime.outputs.directory }}
+        NPM_CONFIG_CACHE: ${{ runner.temp }}/lockfile-maintenance-npm-cache
+      run: npm ci --prefix "$ACTION_DIRECTORY" --omit=dev --ignore-scripts --no-audit --no-fund --prefer-offline
+
+    - name: Authenticate
+      id: authentication
+      shell: bash
+      env:
+        ACTION_DIRECTORY: ${{ steps.runtime.outputs.directory }}
+        INPUT_AUTH: ${{ inputs.auth }}
+        INPUT_TOKEN: ${{ inputs.token }}
+      run: node "$ACTION_DIRECTORY/src/authenticate.js"
+
+    - name: Check for an existing checkout
+      id: checkout
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: node "$ACTION_PATH/scripts/checkout.js"
+
+    - name: Check out the target repository
+      if: steps.checkout.outputs.required == 'true'
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        ref: ${{ inputs.base }}
+        token: ${{ steps.authentication.outputs.token }}
+        persist-credentials: false
+
+    - name: Update lockfiles
+      id: maintenance
+      shell: bash
+      env:
+        ACTION_DIRECTORY: ${{ steps.runtime.outputs.directory }}
+        INPUT_FILES: ${{ inputs.files }}
+        INPUT_MINIMUM-RELEASE-AGE: ${{ inputs.minimum-release-age }}
+        INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}
+        INPUT_CREATE_PULL_REQUEST: ${{ inputs.create-pull-request }}
+        LOCKFILE_REPORT_PATH: ${{ steps.runtime.outputs.directory }}/pull-request.md
+      run: node "$ACTION_DIRECTORY/src/main.js"
+
+    - name: Create or update pull request
+      id: pull-request
+      if: inputs.create-pull-request == 'true'
+      uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+      with:
+        token: ${{ steps.authentication.outputs.token }}
+        branch: ${{ inputs.branch }}
+        base: ${{ inputs.base }}
+        labels: ${{ inputs.labels }}
+        add-paths: ${{ steps.maintenance.outputs.pr-paths }}
+        commit-message: Maintain lockfiles with a minimum release age
+        title: Lockfile maintenance
+        body-path: ${{ steps.runtime.outputs.directory }}/pull-request.md
+        delete-branch: true
+
+    - name: Revoke OIDC installation token
+      if: always() && inputs.auth == 'oidc' && steps.authentication.outputs.token != ''
+      shell: bash
+      env:
+        ACTION_DIRECTORY: ${{ steps.runtime.outputs.directory }}
+        INSTALLATION_TOKEN: ${{ steps.authentication.outputs.token }}
+      run: node "$ACTION_DIRECTORY/src/revoke-token.js"
+
+    - name: Remove Action runtime
+      if: always() && steps.runtime.outputs.directory != ''
+      shell: bash
+      env:
+        ACTION_DIRECTORY: ${{ steps.runtime.outputs.directory }}
+      run: rm -rf -- "$ACTION_DIRECTORY"

@@ -1,0 +1,14 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: ['config:recommended', 'helpers:pinGitHubActionDigests'],
+  timezone: 'Asia/Tokyo',
+  schedule: ['after 9am on friday', 'before 6pm on friday'],
+  labels: ['dependencies'],
+  packageRules: [
+    {
+      matchManagers: ['github-actions'],
+      groupName: 'github actions',
+      minimumReleaseAge: '7 days',
+    },
+  ],
+}

@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - uses: ruby/setup-ruby@a0102e0972be65f351c307e2d64b9314a57c8073 # v1.324.0
+        with:
+          ruby-version: '4.0'
+          bundler: '4.0.21'
+
+      - name: Install dependencies and package managers
+        run: |
+          npm ci --ignore-scripts
+          node node_modules/pnpm/install.js
+          python3 -m venv .tmp/tools/python
+          .tmp/tools/python/bin/pip install uv==0.12.17
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+          echo "$PWD/.tmp/tools/python/bin" >> "$GITHUB_PATH"
+
+      - name: Install tested Cargo toolchain
+        run: rustup toolchain install nightly-2026-09-10 --profile minimal --no-self-update
+
+      - name: Test action and dependency resolution
+        run: node --test test/*.test.js test/integration/*.test.js
+
+      - name: Prepare action smoke test
+        run: |
+          node test/setup-smoke.js
+          git add --force -- .tmp/smoke
+
+      - name: Run action
+        id: maintenance
+        uses: ./ # zizmor: ignore[self-repository] -- Exercise this checkout, including PR changes.
+        with:
+          files: /Cargo.lock
+          working-directory: .tmp/smoke
+          create-pull-request: false
+
+      - name: Verify action outputs
+        env:
+          CHANGED: ${{ steps.maintenance.outputs.changed }}
+          LOCKFILES: ${{ steps.maintenance.outputs.lockfiles }}
+        run: |
+          test "$CHANGED" = true
+          test "$LOCKFILES" = '[".tmp/smoke/Cargo.lock"]'
+
+      - name: Run action again
+        id: repeat
+        uses: ./ # zizmor: ignore[self-repository] -- Exercise this checkout, including PR changes.
+        with:
+          working-directory: .tmp/smoke
+          create-pull-request: false
+
+      - name: Verify idempotence
+        env:
+          CHANGED: ${{ steps.repeat.outputs.changed }}
+        run: test "$CHANGED" = false
+
+  update-v1:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    concurrency:
+      group: update-v1
+      cancel-in-progress: false
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true # zizmor: ignore[artipacked] -- This job only pushes the tested commit to v1.
+
+      - name: Update v1 from the tested main commit
+        shell: bash
+        env:
+          TESTED_SHA: ${{ github.sha }}
+        run: |
+          main_sha=$(git ls-remote --exit-code origin refs/heads/main | cut -f1)
+          if [ "$main_sha" != "$TESTED_SHA" ]; then
+            echo 'main has moved; skipping this older run.'
+            exit 0
+          fi
+          git push --no-follow-tags origin HEAD:refs/heads/v1
