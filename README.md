@@ -213,13 +213,46 @@ jobs:
           minimum-release-age: 3 days
 ```
 
-Only `schedule` and `workflow_dispatch` runs of this workflow on the current default branch and GitHub-hosted runners are accepted.  For manual runs, select the default branch.  The workflow must use GitHub's default branch-based OIDC subject; jobs with an environment or a customized OIDC subject are not supported.
+Only `schedule` and `workflow_dispatch` runs of this workflow on GitHub-hosted runners are accepted.  Without a branch policy, only the current default branch is authorized.  The configuration below can explicitly authorize other branches and restrict the default branch.  The workflow must use GitHub's default branch-based OIDC subject (legacy or immutable); jobs with an environment or a customized OIDC subject are not supported.
 
 The broker checks the App installation and the repository's current ID, owner, and default branch on each exchange.  Removing the repository from the installation, uninstalling the App, or suspending it prevents new tokens from being issued.  Limits apply independently to each repository: three exchanges per run attempt, ten per hour, and thirty per day.  Failed exchanges after identity verification also count toward these limits.
 
 The fixed broker endpoint is `https://lockfile-maintenance-auth.idaemons.org/token`.  GitHub remains the identity provider; the broker validates the signed identity and returns an installation token restricted to the calling repository, with contents and pull requests write permissions.  No App private key or `token:` input is needed in the consuming repository.  The Action masks issued tokens and attempts to revoke the installation token on both success and failure.  A terminated runner may leave it valid until its GitHub expiry (normally one hour).
 
 OIDC identifies the workflow, not this composite Action or its version.  Treat the authorized workflow and its repository configuration as trusted code.  The installation token grants repository write access; GitHub does not restrict it to lockfiles.
+
+### Running from maintenance branches
+
+To authorize OIDC authentication from additional branches, add `.github/lockfile-maintenance-auth.yml` to the repository's default branch:
+
+```yaml
+allowed_branches:
+  - main
+  - v1
+  - v2
+```
+
+When `allowed_branches` is present, only listed branches are authorized.  Include your default branch explicitly (`main` or `master`, for example) if it should remain authorized.  An empty list denies all branches.  Use exact branch names, without `refs/heads/`; globs and regular expressions are not supported.  Keep `.github/workflows/lockfile-maintenance.yml` on both the default branch and each branch you want to run.  Then select an authorized branch when manually dispatching the workflow, for example:
+
+```sh
+gh workflow run lockfile-maintenance.yml --ref v1
+```
+
+On that branch, configure the Action to update the same base and use a separate PR branch:
+
+```yaml
+- uses: knu/lockfile-maintenance-action@v1
+  with:
+    auth: oidc
+    base: v1
+    branch: automation/lockfile-maintenance-v1
+```
+
+The broker checks the OIDC workflow ref, not the checkout ref or the `base` input.  The `base` input still defaults to the repository's default branch.  An existing checkout is preserved, so it must also point to the intended base.  Serialize runs that share a maintenance PR branch.
+
+The broker reads authorization from the current default branch's head commit on every exchange.  Configuration on the calling branch cannot authorize it.  When the file or `allowed_branches` key is absent, only the current default branch is authorized; an empty or comments-only file also uses this default.  Invalid configuration, duplicate or unknown keys, or a branch absent from an explicit list deny authentication, including on the default branch.  The file must be a single UTF-8 YAML document of at most 16 KiB.  Comments are supported; aliases and unsupported tags are rejected.  Removing an entry prevents new exchanges that read the updated configuration; tokens already issued remain valid until revoked or expired.
+
+This configuration only authorizes authentication.  It does not start or schedule workflows; GitHub's `schedule` event runs only on the default branch.  Adding a branch trusts its workflow and the code it executes with the App token's repository-wide write permissions, not just permission to update that branch.
 
 ## Release-age behavior
 
