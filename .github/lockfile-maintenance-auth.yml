@@ -1,0 +1,3 @@
+allowed_branches:
+  - main
+  - v1
