@@ -15,6 +15,12 @@ inputs:
   token:
     description: Token for checkout and PR creation. Requires contents read access, plus contents and pull-requests write access for PR creation.
     default: ${{ github.token }}
+  author:
+    description: 'Commit author in the format Name <email@example.com>.'
+    default: 'lockfile-maintenance[bot] <331761537+lockfile-maintenance[bot]@users.noreply.github.com>'
+  committer:
+    description: 'Commit committer in the format Name <email@example.com>.'
+    default: 'lockfile-maintenance[bot] <331761537+lockfile-maintenance[bot]@users.noreply.github.com>'
   branch:
     description: Branch for the maintenance PR. Use a different branch for each independent file selection.
     default: automation/lockfile-maintenance
@@ -140,6 +146,8 @@ runs:
       with:
         token: ${{ steps.authentication.outputs.token }}
         branch: ${{ inputs.branch }}
+        author: ${{ inputs.author }}
+        committer: ${{ inputs.committer }}
         base: ${{ inputs.base }}
         labels: ${{ inputs.labels }}
         add-paths: ${{ steps.maintenance.outputs.pr-paths }}

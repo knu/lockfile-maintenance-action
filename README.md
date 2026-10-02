@@ -97,6 +97,12 @@ The Action sets up Node.js 24 for its own runtime and installs its runtime depen
 
   Default: `${{ github.token }}`
 
+- `author`, `committer` (string, optional)
+
+  Author and committer of maintenance commits, each in `Name <email@example.com>` format.  These apply in both authentication modes.  The PR author is determined by the authentication token: with `auth: oidc`, PRs are created by `lockfile-maintenance[bot]` using the Lockfile Maintenance App's installation token.
+
+  Default for both: `lockfile-maintenance[bot] <331761537+lockfile-maintenance[bot]@users.noreply.github.com>`
+
 - `branch` (string, optional)
 
   Branch used for the maintenance PR.  Repeated runs update the same PR.  Use distinct branches for independent file selections, and serialize workflow runs that use the same branch.
