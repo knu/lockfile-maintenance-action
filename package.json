@@ -7,7 +7,7 @@
     "test": "node --test test/*.test.js",
     "test:integration": "node --test test/integration/*.test.js",
     "lint": "oxlint src test scripts",
-    "format:check": "oxfmt --check src test scripts package.json action.yml examples .github"
+    "format:check": "oxfmt --check src test scripts package.json action.yml request-rebase examples .github"
   },
   "dependencies": {
     "@actions/core": "3.0.1",

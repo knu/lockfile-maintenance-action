@@ -5,6 +5,7 @@ import { parseAge } from './age.js';
 import { listFiles, selectFiles } from './files.js';
 import { defaultPatterns, managers } from './managers/index.js';
 import { pullRequestPaths } from './pull-request.js';
+import { rebaseInstructions } from './rebase.js';
 import { changedFiles, restore, snapshot } from './transaction.js';
 import { changeReport, packageVersions, versionChanges } from './version-changes.js';
 
@@ -88,7 +89,13 @@ export async function maintainLockfile(env) {
         );
         files.push({ file: target.file, changes: versionChanges(before.get(target.file), after) });
       }
-      const report = changeReport(files, env['INPUT_MINIMUM-RELEASE-AGE'] ?? '3 days');
+      const instructions = prPaths === undefined ? '' : rebaseInstructions(env);
+      const report =
+        changeReport(
+          files,
+          env['INPUT_MINIMUM-RELEASE-AGE'] ?? '3 days',
+          60000 - Buffer.byteLength(instructions),
+        ) + (instructions ? `\n${instructions}` : '');
       await writeFile(env.LOCKFILE_REPORT_PATH, report);
       if (env.GITHUB_STEP_SUMMARY) await appendFile(env.GITHUB_STEP_SUMMARY, report);
     }

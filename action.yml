@@ -6,6 +6,15 @@ branding:
   color: green
 
 inputs:
+  request-comment:
+    description: Rebase request comment ID forwarded from workflow_dispatch inputs.
+    default: ''
+  request-pull-request:
+    description: Rebase request PR number forwarded from workflow_dispatch inputs.
+    default: ''
+  reaction-token:
+    description: Token for rebase completion reactions. Requires issues write permission.
+    default: ${{ github.token }}
   create-pull-request:
     description: Create or update a PR. Set to false to only update files in the checkout.
     default: 'true'
@@ -155,6 +164,18 @@ runs:
         title: Lockfile maintenance
         body-path: ${{ steps.runtime.outputs.directory }}/pull-request.md
         delete-branch: true
+
+    - name: Report rebase result
+      if: always() && inputs.request-comment != ''
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        INPUT_TOKEN: ${{ inputs.reaction-token }}
+        INPUT_REQUEST_COMMENT: ${{ inputs.request-comment }}
+        INPUT_REQUEST_PULL_REQUEST: ${{ inputs.request-pull-request }}
+        UPDATE_OUTCOME: ${{ steps.pull-request.outcome }}
+        UPDATED_PULL_REQUEST: ${{ steps.pull-request.outputs.pull-request-number }}
+      run: node "$ACTION_PATH/src/finish-rebase.js"
 
     - name: Revoke OIDC installation token
       if: always() && inputs.auth == 'oidc' && steps.authentication.outputs.token != ''

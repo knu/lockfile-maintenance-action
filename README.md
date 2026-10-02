@@ -77,6 +77,14 @@ The Action sets up Node.js 24 for its own runtime and installs its runtime depen
 
 ### Inputs
 
+- `request-comment`, `request-pull-request` (string, optional)
+
+  Comment ID and PR number forwarded from the request job through `workflow_dispatch` inputs.  Pass both to report the result on the command comment.  Leave them empty for scheduled or ordinary manual runs.
+
+- `reaction-token` (string, optional)
+
+  Token used to report rebase results on command comments.  Requires `issues: write`.  Defaults to `github.token`, independently of `auth` and `token`, so OIDC authentication failures can still be reported.
+
 - `auth` (string, optional)
 
   Authentication mode: `token` uses the supplied `token` or `github.token`; `oidc` exchanges a GitHub Actions identity token for a repository-scoped installation token from the Lockfile Maintenance App.  OIDC requires `id-token: write`, an App installation, and authorization by the broker.  It never falls back to another credential on failure.
@@ -191,6 +199,83 @@ The PR integration cannot accept commas or newlines in selected file paths.  For
 ```
 
 A PR creation failure fails the Action; the file-update rollback applies to dependency-update failures, not to a later push or API failure.
+
+### Requesting a rebase
+
+Each maintenance PR includes a rebase checkbox, instructions to comment `/lockfile rebase`, and a link to the workflow's Actions page.  Rebase requests regenerate the selected lockfiles from the latest base and update the same PR.  Dependency versions may change during resolution.  The reserved maintenance branch must not contain manual changes you need to preserve.
+
+To enable both PR controls, add these subscriptions to the consuming workflow's `on` section:
+
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      request-comment:
+        description: Rebase request comment ID (set by the request job).
+        type: string
+        default: ''
+      request-pull-request:
+        description: Rebase request PR number (set by the request job).
+        type: string
+        default: ''
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [edited]
+```
+
+Comments require `issue_comment`; checkbox edits require `pull_request_target`.  Keep any existing `schedule` entry.  The workflow must exist on the default branch.  Event subscriptions alone are not enough: add a separate request job and restrict the maintenance job to scheduled and dispatched runs:
+
+```yaml
+jobs:
+  request-rebase:
+    if: github.event_name == 'issue_comment' || github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - uses: knu/lockfile-maintenance-action/request-rebase@v1 # zizmor: ignore[unpinned-uses] -- Follow the v1 release series in this example.
+
+  update:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: lockfile-maintenance
+      cancel-in-progress: false
+    # Add issues: write to this job's existing permissions.
+    # Keep existing setup steps, then forward the request inputs:
+    steps:
+      - uses: knu/lockfile-maintenance-action@v1 # zizmor: ignore[unpinned-uses] -- Follow the v1 release series in this example.
+        with:
+          request-comment: ${{ inputs.request-comment }}
+          request-pull-request: ${{ inputs.request-pull-request }}
+          # Keep existing maintenance inputs, including auth/token and files.
+```
+
+Move maintenance concurrency from the workflow level to the update job, so unrelated PR events cannot replace a pending update.  See the [complete OIDC example](examples/oidc-maintenance.yml).  Do not check out or execute PR code in the request job.  It only validates the request and dispatches the maintenance workflow using `GITHUB_TOKEN`; the dispatched job uses its usual token or OIDC authentication.  No broker changes or additional secrets are needed.
+
+The request Action accepts these inputs:
+
+| Input | Default | Purpose |
+| --- | --- | --- |
+| `token` | `github.token` | Requires actions write, issues write and pull requests read access. |
+| `branch` | `automation/lockfile-maintenance` | Expected maintenance PR head branch. |
+| `base` | Repository default branch | Expected maintenance PR base branch. |
+| `workflow` | Calling workflow's filename | Workflow to dispatch. |
+| `ref` | Repository default branch | Trusted branch on which to run that workflow. |
+
+Keep `branch` and `base` consistent with the maintenance Action's configuration.  For maintenance on another branch, also set `ref` to the trusted branch containing its workflow and authorize that branch for OIDC as described below.  Never derive these inputs from PR text or an unvalidated PR head.  With several maintenance configurations, use a separate request Action invocation for each branch/base pair and dispatch the corresponding configured workflow.  The target workflow must declare the two request inputs above.  Other dispatch inputs use their defaults; additional required inputs without defaults are not supported.
+
+A new comment with `/lockfile rebase` on its own line, or an unchecked-to-checked transition of the generated checkbox, requests a run.  Other lines and whitespace around the command are allowed.  The sender must be a user with write, maintain, or admin permission.  The PR must still be open and use the configured branches in the same repository.  Bot edits, ordinary body edits, edited comments, and fork PRs do not trigger maintenance.  The `dispatched` output reports whether a run was requested, and the request job summary links to the workflow runs.
+
+Accepted command comments receive 👀 before dispatch.  After maintenance succeeds for the requested PR, the Action adds 👍; dispatch or maintenance failures add 😕 (`confused`, one of GitHub's supported reactions).  The acceptance reaction remains as a record.  Result reactions use `reaction-token`, not the OIDC installation token, and verify that the comment belongs to the requested PR.  A failure before the maintenance Action starts, runner termination, or unavailable GitHub API can prevent notification; follow the workflow link if only 👀 remains.  Queueing and tool setup mean acceptance and completion need not be immediate.
+
+The checkbox resets when maintenance successfully updates the PR body.  After a failure, uncheck and check it again, post a new command comment, or use the workflow link.  Without the event subscriptions and request job, the PR controls have no effect: follow the link and select **Run workflow**, choosing the branch used for maintenance.  Manual execution requires `workflow_dispatch` and repository write access.  The PR always includes this fallback; the Action does not inspect the workflow to determine which controls are enabled.
 
 ## OIDC authentication
 

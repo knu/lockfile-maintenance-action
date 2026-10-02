@@ -1,20 +1,52 @@
 name: Lockfile maintenance
 
-on:
+on: # zizmor: ignore[dangerous-triggers] -- PR events only validate and dispatch; no PR checkout or execution.
   workflow_dispatch:
+    inputs:
+      request-comment:
+        description: Rebase request comment ID (set by the request job).
+        type: string
+        default: ''
+      request-pull-request:
+        description: Rebase request PR number (set by the request job).
+        type: string
+        default: ''
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [edited]
   schedule:
     - cron: '0 0 * * 5' # Friday 09:00 JST
 
-concurrency:
-  group: lockfile-maintenance
-  cancel-in-progress: false
-
 permissions:
   contents: read
-  id-token: write
 
 jobs:
+  request-rebase:
+    if: github.event_name == 'issue_comment' || github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: knu/lockfile-maintenance-action/request-rebase@v1 # zizmor: ignore[unpinned-uses] -- Follow the tested v1 release series.
+
   maintain:
+    permissions:
+      issues: write
+      contents: read
+      id-token: write
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    concurrency:
+      group: lockfile-maintenance
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -25,6 +57,8 @@ jobs:
 
       - uses: knu/lockfile-maintenance-action@v1 # zizmor: ignore[unpinned-uses] -- Follow the tested v1 release series.
         with:
+          request-comment: ${{ inputs.request-comment }}
+          request-pull-request: ${{ inputs.request-pull-request }}
           auth: oidc
           files: /package-lock.json
           minimum-release-age: 3 days

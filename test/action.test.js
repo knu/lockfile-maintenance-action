@@ -157,11 +157,22 @@ test('exports literal PR paths when PR creation is enabled, including unchanged 
     { cwd: f.workspace },
   );
   assert.equal(committed.code, 0, committed.stderr);
-  const result = await f.invoke({ INPUT_CREATE_PULL_REQUEST: 'true', TEST_MODE: 'unchanged' });
+  const report = path.join(f.directory, 'report.md');
+  const result = await f.invoke({
+    INPUT_CREATE_PULL_REQUEST: 'true',
+    TEST_MODE: 'unchanged',
+    LOCKFILE_REPORT_PATH: report,
+    GITHUB_REPOSITORY: 'owner/repo',
+    GITHUB_WORKFLOW_REF: 'owner/repo/.github/workflows/maintenance.yml@refs/heads/main',
+  });
   assert.equal(result.code, 0, result.stderr);
   const output = await readFile(f.output, 'utf8');
   assert.match(output, /changed=false\n/);
   assert.match(output, /pr-paths<<([^\n]+)\n:\(literal\)Cargo.lock\n\1\n/);
+  const body = await readFile(report, 'utf8');
+  assert.match(body, /- \[ \] Rebase this PR/);
+  assert.match(body, /\/lockfile rebase/);
+  assert.match(body, /https:\/\/github.com\/owner\/repo\/actions\/workflows\/maintenance.yml/);
 });
 
 test('scopes patterns to working-directory without excluding tracked directories', async (t) => {

@@ -1,0 +1,40 @@
+name: Request lockfile rebase
+description: Dispatch maintenance after an authorized PR comment or checkbox request.
+inputs:
+  token:
+    description: GitHub token with actions write, issues write and pull-requests read permissions.
+    default: ${{ github.token }}
+  branch:
+    description: Reserved maintenance PR branch. Must match the maintenance Action.
+    default: automation/lockfile-maintenance
+  base:
+    description: Expected PR base. Must match the maintenance Action.
+    default: ${{ github.event.repository.default_branch }}
+  workflow:
+    description: Workflow filename to dispatch. Defaults to the calling workflow.
+    default: ''
+  ref:
+    description: Trusted branch on which to dispatch the workflow.
+    default: ${{ github.event.repository.default_branch }}
+outputs:
+  dispatched:
+    description: Whether a maintenance run was requested.
+    value: ${{ steps.request.outputs.dispatched }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '24'
+        package-manager-cache: false
+    - name: Request rebase
+      id: request
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_BRANCH: ${{ inputs.branch }}
+        INPUT_BASE: ${{ inputs.base }}
+        INPUT_WORKFLOW: ${{ inputs.workflow }}
+        INPUT_REF: ${{ inputs.ref }}
+      run: node "$ACTION_PATH/../src/request-rebase.js"
