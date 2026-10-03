@@ -1,6 +1,9 @@
 name: Request lockfile rebase
 description: Dispatch maintenance after an authorized PR comment or checkbox request.
 inputs:
+  wait-for-completion:
+    description: Track the dispatched run and react to comment requests on completion without workflow_dispatch inputs. Requires GitHub API 2026-03-10.
+    default: 'false'
   token:
     description: GitHub token with actions write, issues write and pull-requests read permissions.
     default: ${{ github.token }}
@@ -37,4 +40,5 @@ runs:
         INPUT_BASE: ${{ inputs.base }}
         INPUT_WORKFLOW: ${{ inputs.workflow }}
         INPUT_REF: ${{ inputs.ref }}
+        INPUT_WAIT_FOR_COMPLETION: ${{ inputs.wait-for-completion }}
       run: node "$ACTION_PATH/../src/request-rebase.js"

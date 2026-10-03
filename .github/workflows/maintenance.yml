@@ -1,0 +1,161 @@
+name: Lockfile maintenance
+on:
+  workflow_call:
+    inputs:
+      auth:
+        description:
+          Authentication mode (token or oidc). OIDC requires id-token write permission and broker
+          authorization.
+        type: string
+        default: oidc
+      files:
+        description:
+          'Newline-separated gitignore-style patterns relative to working-directory. Positive
+          patterns include lockfiles; ! excludes; the last matching line wins. Supports *, **, /
+          anchors, directory patterns, # comments, and backslash escapes. Only Git-tracked files
+          with supported lockfile names are considered. By default, selects all supported
+          Git-tracked lockfiles, including subdirectories. Symlinks are not followed. Matching no
+          lockfiles is an error. Requires npm >=11.10; pnpm, Yarn, uv, and Bundler are prepared
+          automatically; Cargo installs a pinned nightly.'
+        type: string
+        default: |
+          Cargo.lock
+          package-lock.json
+          pnpm-lock.yaml
+          yarn.lock
+          uv.lock
+          Gemfile.lock
+      minimum-release-age:
+        description:
+          Positive integer and plural unit (seconds, minutes, hours, days, weeks, months). Months
+          mean 30 days. Rounded up to minutes for pnpm/Yarn and days for Bundler. Passed to native
+          resolvers; their source/package exceptions and missing-timestamp behavior still apply. Git
+          dependencies are not age-checked.
+        type: string
+        default: 3 days
+      working-directory:
+        description: Root for file patterns, relative to the checkout.
+        type: string
+        default: .
+      branch:
+        description: Branch for the maintenance PR. Use a different branch for each independent file selection.
+        type: string
+        default: automation/lockfile-maintenance
+      base:
+        description: Target branch for the PR and automatic checkout. An existing checkout is preserved.
+        type: string
+        default: ''
+      labels:
+        description: Comma or newline-separated labels for the PR.
+        type: string
+        default: dependencies
+      setup-pnpm:
+        description:
+          Automatically prepare pnpm for selected lockfiles. Set to false to use a manually
+          installed pnpm.
+        type: boolean
+        default: true
+      setup-yarn:
+        description:
+          Automatically prepare Yarn for selected lockfiles. Set to false to use a manually
+          installed Yarn.
+        type: boolean
+        default: true
+      setup-uv:
+        description: Automatically prepare uv when uv.lock is selected.
+        type: boolean
+        default: true
+      uv-version:
+        description: uv version to install during automatic setup.
+        type: string
+        default: 0.12.17
+      setup-bundler:
+        description: Automatically prepare Ruby and Bundler when Gemfile.lock is selected.
+        type: boolean
+        default: true
+      ruby-version:
+        description: Ruby version for automatic Bundler setup. Use separate invocations for projects
+          requiring different Ruby versions.
+        type: string
+        default: '4.0'
+      bundler-version:
+        description: Bundler version to install during automatic setup. Requires >=4.0.18.
+        type: string
+        default: 4.0.21
+      setup-rustup:
+        description: Install rustup when Cargo.lock is selected and rustup is unavailable.
+        type: boolean
+        default: true
+    secrets:
+      token:
+        description: Write token when auth is token. Not needed for OIDC.
+        required: false
+    outputs:
+      pull-request-url:
+        description: Maintenance PR URL.
+        value: ${{ jobs.maintain.outputs.pull-request-url }}
+      changed:
+        description: Whether lockfiles changed.
+        value: ${{ jobs.maintain.outputs.changed }}
+permissions:
+  contents: read
+jobs:
+  request-rebase:
+    if:
+      github.event.sender.type == 'User' && (github.event_name == 'issue_comment' || github.event_name
+      == 'pull_request_target')
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    permissions:
+      actions: write
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - uses: $/request-rebase
+        with:
+          branch: ${{ inputs.branch }}
+          base: ${{ inputs.base || github.event.repository.default_branch }}
+          wait-for-completion: true
+  maintain:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: lockfile-maintenance-${{ inputs.branch }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+    outputs:
+      pull-request-url: ${{ steps.maintenance.outputs.pull-request-url }}
+      changed: ${{ steps.maintenance.outputs.changed }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - name: Update lockfiles
+        id: maintenance
+        uses: $/
+        with:
+          auth: ${{ inputs.auth }}
+          files: ${{ inputs.files }}
+          minimum-release-age: ${{ inputs.minimum-release-age }}
+          working-directory: ${{ inputs.working-directory }}
+          branch: ${{ inputs.branch }}
+          base: ${{ inputs.base || github.event.repository.default_branch }}
+          labels: ${{ inputs.labels }}
+          setup-pnpm: ${{ inputs.setup-pnpm }}
+          setup-yarn: ${{ inputs.setup-yarn }}
+          setup-uv: ${{ inputs.setup-uv }}
+          uv-version: ${{ inputs.uv-version }}
+          setup-bundler: ${{ inputs.setup-bundler }}
+          ruby-version: ${{ inputs.ruby-version }}
+          bundler-version: ${{ inputs.bundler-version }}
+          setup-rustup: ${{ inputs.setup-rustup }}
+          token: ${{ secrets.token || github.token }}

@@ -34,7 +34,7 @@ export function rebaseInstructions(env) {
     '',
     `Check the box above or post a new PR comment with \`${rebaseCommand}\` on its own line.  Requires repository write access.`,
     '',
-    'The workflow must subscribe to `pull_request_target: types: [edited]` for the checkbox and `issue_comment: types: [created]` for comments, and configure the request-rebase job.',
+    'The workflow must subscribe to `pull_request_target: types: [edited]` for the checkbox and `issue_comment: types: [created]` for comments, and use the reusable workflow or configure the request-rebase job.',
     `If these handlers are not configured, [open the maintenance workflow](<${workflowUrl(env)}>) and select **Run workflow** on the branch used for maintenance.  This requires \`workflow_dispatch\`.`,
     '',
   ].join('\n');
@@ -99,7 +99,12 @@ function githubApi(env, request) {
   };
 }
 
-export async function dispatchRebase(env, event, request = fetch) {
+export async function dispatchRebase(
+  env,
+  event,
+  request = fetch,
+  wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+) {
   const number = rebaseRequest(env.GITHUB_EVENT_NAME, event);
   if (!Number.isSafeInteger(number) || number < 1) return false;
   const repository = env.GITHUB_REPOSITORY;
@@ -126,12 +131,26 @@ export async function dispatchRebase(env, event, request = fetch) {
   const reaction = (content) => api(`issues/comments/${comment}/reactions`, { content });
   if (comment) await reaction('eyes');
   try {
-    await api(`actions/workflows/${encode(workflow)}/dispatches`, {
+    const track = comment && env.INPUT_WAIT_FOR_COMPLETION === 'true';
+    const run = await api(`actions/workflows/${encode(workflow)}/dispatches`, {
       ref: env.INPUT_REF || event.repository.default_branch,
-      ...(comment
+      ...(comment && !track
         ? { inputs: { 'request-comment': String(comment), 'request-pull-request': String(number) } }
         : {}),
     });
+    if (track) {
+      if (!Number.isSafeInteger(run?.workflow_run_id) || run.workflow_run_id < 1)
+        throw new Error('dispatch did not return a workflow run ID');
+      for (let attempt = 0; ; attempt++) {
+        const result = await api(`actions/runs/${run.workflow_run_id}`);
+        if (result.status === 'completed') {
+          await reaction(result.conclusion === 'success' ? '+1' : 'confused');
+          break;
+        }
+        if (attempt === 270) throw new Error('timed out waiting for maintenance');
+        await wait(10000);
+      }
+    }
   } catch (error) {
     if (comment) await reaction('confused');
     throw error;

@@ -354,3 +354,97 @@ test('result notification runs on failures before token revocation and uses its 
       steps.findIndex((step) => step.name === 'Revoke OIDC installation token'),
   );
 });
+
+test('completion tracking omits dispatch inputs and follows only the returned run', async () => {
+  for (const conclusion of ['success', 'failure', 'cancelled']) {
+    const mock = api({ status: 200 });
+    const polls = [];
+    let waits = 0;
+    const request = async (url, options) => {
+      if (url.includes('/actions/runs/')) {
+        polls.push(url);
+        return Response.json(
+          polls.length === 1 ? { status: 'in_progress' } : { status: 'completed', conclusion },
+        );
+      }
+      return mock.request(url, options);
+    };
+    assert.equal(
+      await dispatchRebase(
+        { ...env, INPUT_WAIT_FOR_COMPLETION: 'true' },
+        event,
+        request,
+        async () => {
+          waits++;
+        },
+      ),
+      true,
+    );
+    assert.equal(waits, 1);
+    assert.deepEqual(
+      polls,
+      Array(2).fill('https://api.github.com/repos/owner/project/actions/runs/1'),
+    );
+    assert.deepEqual(JSON.parse(mock.calls[3].body), { ref: 'main' });
+    assert.deepEqual(JSON.parse(mock.calls.at(-1).body), {
+      content: conclusion === 'success' ? '+1' : 'confused',
+    });
+  }
+});
+
+test('completion tracking reports missing run IDs and timeout as failures', async () => {
+  for (const status of [204, 200]) {
+    const mock = api({ status });
+    const request = async (url, options) =>
+      url.includes('/actions/runs/')
+        ? Response.json({ status: 'queued' })
+        : mock.request(url, options);
+    await assert.rejects(
+      dispatchRebase({ ...env, INPUT_WAIT_FOR_COMPLETION: 'true' }, event, request, async () => {}),
+      status === 204 ? /run ID/ : /timed out/,
+    );
+    assert.deepEqual(JSON.parse(mock.calls.at(-1).body), { content: 'confused' });
+  }
+});
+
+test('reusable workflow keeps request permissions separate and uses its own pinned source', async () => {
+  const workflow = parseYaml(
+    await readFile(new URL('../.github/workflows/maintenance.yml', import.meta.url), 'utf8'),
+  );
+  const request = workflow.jobs['request-rebase'];
+  const maintain = workflow.jobs.maintain;
+  assert.deepEqual(request.permissions, {
+    actions: 'write',
+    issues: 'write',
+    'pull-requests': 'read',
+  });
+  assert.match(request.if, /sender.type == 'User'/);
+  assert.equal(
+    maintain.if,
+    "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+  );
+  assert.equal(maintain.permissions['id-token'], 'write');
+  assert.equal(maintain.permissions.contents, 'read');
+  assert.equal(workflow.concurrency, undefined);
+  assert.equal(request.concurrency, undefined);
+  assert.equal(maintain.concurrency['cancel-in-progress'], false);
+  const handler = request.steps.find((step) => step.uses === '$/request-rebase');
+  assert.equal(handler.with['wait-for-completion'], true);
+  assert.equal(
+    request.steps.some((step) => step.uses?.startsWith('actions/checkout')),
+    false,
+  );
+  const action = maintain.steps.find((step) => step.id === 'maintenance');
+  assert.equal(action.uses, '$/');
+  assert.equal(action.with['request-comment'], undefined);
+  assert.equal(action.with['request-pull-request'], undefined);
+  for (const name of Object.keys(workflow.on.workflow_call.inputs))
+    assert.ok(Object.hasOwn(action.with, name), name);
+  const caller = parseYaml(
+    await readFile(new URL('../examples/reusable-maintenance.yml', import.meta.url), 'utf8'),
+  );
+  assert.equal(Object.keys(caller.jobs).length, 1);
+  assert.equal(caller.on.workflow_dispatch, null);
+  assert.deepEqual(caller.on.issue_comment.types, ['created']);
+  assert.deepEqual(caller.on.pull_request_target.types, ['edited']);
+});

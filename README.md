@@ -19,6 +19,42 @@ Renovate already forwards age limits to npm and Poetry; it is not missing this i
 
 ## Usage
 
+For normal use, call the reusable workflow.  Install the [Lockfile Maintenance App](https://github.com/apps/lockfile-maintenance) and configure [OIDC authorization](#oidc-authentication) first.
+
+```yaml
+name: Lockfile maintenance
+on: # zizmor: ignore[dangerous-triggers] -- The reusable workflow validates requests and only updates through trusted dispatch.
+  schedule:
+    - cron: 0 0 * * 5
+  workflow_dispatch:
+  issue_comment:
+    types:
+      - created
+  pull_request_target:
+    types:
+      - edited
+permissions:
+  contents: read
+  actions: write
+  issues: write
+  pull-requests: read
+  id-token: write
+jobs:
+  maintenance:
+    uses: knu/lockfile-maintenance-action/.github/workflows/maintenance.yml@v1 # zizmor: ignore[unpinned-uses] -- Follow the tested v1 release series.
+    with:
+      auth: oidc
+      files: /pnpm-lock.yaml
+```
+
+The caller owns the event subscriptions and grants the permissions shown above.  The reusable workflow supplies Harden-Runner, separate request and update jobs, automatic tool setup, serialization, and reactions.  It uses the same commit of its bundled actions through GitHub's `$/` syntax.  See [the complete caller example](examples/reusable-maintenance.yml).
+
+Keep `workflow_dispatch` enabled, without request-metadata inputs.  Comments dispatch the caller workflow and keep the request job running while it polls that exact run for completion, for up to about 45 minutes.  Success adds 👍; failure, cancellation, or a wait timeout adds 😕.  A timeout does not cancel the update.  Checkbox requests dispatch and return immediately.  Do not add caller-level concurrency that serializes the request run with the dispatched run; serialization belongs to the update job.
+
+The reusable workflow defaults to `auth: oidc`.  For token authentication, use `auth: token` and pass a write token as `secrets.token`; its GITHUB_TOKEN intentionally has only read access to contents.  Tool selection, minimum release age, branch/base, labels, working directory, and setup options are available as workflow inputs.  The outputs are `pull-request-url` and `changed`.  GitHub.com is required for the self-repository syntax and dispatch run tracking.
+
+### Using the composite action directly
+
 ``` yaml
 on:
   schedule:
