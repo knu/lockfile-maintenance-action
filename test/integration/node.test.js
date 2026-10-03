@@ -86,6 +86,7 @@ for (const scenario of ['npm', 'npm-installed', 'pnpm', 'yarn']) {
       name: 'test-project',
       private: true,
       ...(manager === 'pnpm' ? { packageManager: 'pnpm@12.4.2' } : {}),
+      ...(manager === 'yarn' ? { packageManager: 'yarn@4.18.0' } : {}),
       dependencies: { 'maint-fixture': '^1.0.0' },
     });
     await writeFile(path.join(workspace, 'package.json'), manifest);
@@ -141,7 +142,9 @@ for (const scenario of ['npm', 'npm-installed', 'pnpm', 'yarn']) {
     const result = await run(process.execPath, [main], { cwd: workspace, env });
     assert.equal(result.code, 0, result.stderr + result.stdout);
     assert.equal(
-      (await readdir(directory)).some((name) => name.startsWith('lockfile-pnpm-')),
+      (await readdir(directory)).some(
+        (name) => name.startsWith('lockfile-pnpm-') || name.startsWith('lockfile-yarn-'),
+      ),
       false,
     );
     const report = await readFile(env.LOCKFILE_REPORT_PATH, 'utf8');

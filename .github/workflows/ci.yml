@@ -78,6 +78,26 @@ jobs:
           CHANGED: ${{ steps.repeat.outputs.changed }}
         run: test "$CHANGED" = false
 
+      - name: Prepare automatic tool setup smoke test
+        run: |
+          node test/setup-tools-smoke.js
+          git add --force -- .tmp/tool-smoke
+
+      - name: Exercise automatic Yarn, uv and Bundler setup
+        id: tools-smoke
+        uses: ./ # zizmor: ignore[self-repository] -- Exercise automatic setup from this checkout.
+        with:
+          working-directory: .tmp/tool-smoke
+          create-pull-request: false
+
+      - name: Verify automatic tool setup outputs
+        env:
+          CHANGED: ${{ steps.tools-smoke.outputs.changed }}
+          LOCKFILES: ${{ steps.tools-smoke.outputs.lockfiles }}
+        run: |
+          test "$CHANGED" = true
+          test "$LOCKFILES" = '[".tmp/tool-smoke/bundler/Gemfile.lock",".tmp/tool-smoke/uv/uv.lock",".tmp/tool-smoke/yarn/yarn.lock"]'
+
   update-v1:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

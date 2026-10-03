@@ -3,6 +3,7 @@ import { command, requireVersion } from '../command.js';
 import { prepareCargo, updateCargo } from './cargo.js';
 import { prepareNpm, updateNpm } from './npm.js';
 import { preparePnpm, updatePnpm } from './pnpm.js';
+import { prepareNodeManager } from './node-setup.js';
 
 export const managers = new Map([
   [
@@ -37,7 +38,13 @@ export const managers = new Map([
     {
       name: 'yarn',
       manifest: 'package.json',
-      prepare: (context) => requireVersion('yarn', '4.10.0', context),
+      prepare: (context) =>
+        prepareNodeManager(context, {
+          name: 'yarn',
+          packageName: '@yarnpkg/cli-dist',
+          minimum: '4.10.0',
+          fallback: '4.18.0',
+        }),
       async update(context) {
         await command('yarn', ['up', '-R', '--mode=update-lockfile', '*', '@*/*'], {
           ...context,

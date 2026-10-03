@@ -51,6 +51,7 @@ if (process.env.TEST_FAIL_TOOL === tool || process.env.TEST_MODE === 'failure') 
     PATH: `${bin}${path.delimiter}${process.env.PATH}`,
     CALL_LOG: log,
     INPUT_SETUP_PNPM: 'false',
+    INPUT_SETUP_YARN: 'false',
     GITHUB_WORKSPACE: workspace,
     GITHUB_OUTPUT: output,
     'INPUT_MINIMUM-RELEASE-AGE': '3 days',

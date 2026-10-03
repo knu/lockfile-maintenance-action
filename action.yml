@@ -6,6 +6,27 @@ branding:
   color: green
 
 inputs:
+  setup-yarn:
+    description: Automatically prepare Yarn for selected lockfiles. Set to false to use a manually installed Yarn.
+    default: 'true'
+  setup-uv:
+    description: Automatically prepare uv when uv.lock is selected.
+    default: 'true'
+  uv-version:
+    description: uv version to install during automatic setup.
+    default: '0.12.17'
+  setup-bundler:
+    description: Automatically prepare Ruby and Bundler when Gemfile.lock is selected.
+    default: 'true'
+  ruby-version:
+    description: Ruby version for automatic Bundler setup. Use separate invocations for projects requiring different Ruby versions.
+    default: '4.0'
+  bundler-version:
+    description: Bundler version to install during automatic setup. Requires >=4.0.18.
+    default: '4.0.21'
+  setup-rustup:
+    description: Install rustup when Cargo.lock is selected and rustup is unavailable.
+    default: 'true'
   setup-pnpm:
     description: Automatically prepare pnpm for selected lockfiles. Set to false to use a manually installed pnpm.
     default: 'true'
@@ -50,8 +71,8 @@ inputs:
       Only Git-tracked files with supported lockfile names are considered.
       By default, selects all supported Git-tracked lockfiles, including subdirectories.
       Symlinks are not followed.
-      Matching no lockfiles is an error. Requires npm >=11.10; pnpm is prepared automatically; set up Yarn >=4.10,
-      uv >=0.9.17, or Bundler >=4.0.18 before use; Cargo installs a pinned nightly.
+      Matching no lockfiles is an error. Requires npm >=11.10; pnpm, Yarn, uv, and Bundler
+      are prepared automatically; Cargo installs a pinned nightly.
     default: |
       Cargo.lock
       package-lock.json
@@ -139,11 +160,48 @@ runs:
         token: ${{ steps.authentication.outputs.token }}
         persist-credentials: false
 
+    - name: Detect required tools
+      id: tools
+      shell: bash
+      env:
+        ACTION_DIRECTORY: ${{ steps.runtime.outputs.directory }}
+        INPUT_FILES: ${{ inputs.files }}
+        INPUT_MINIMUM-RELEASE-AGE: ${{ inputs.minimum-release-age }}
+        INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}
+      run: node "$ACTION_DIRECTORY/src/setup-tools.js"
+
+    - name: Set up uv
+      if: steps.tools.outputs.uv == 'true' && inputs.setup-uv == 'true'
+      uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      with:
+        version: ${{ inputs.uv-version }}
+        enable-cache: false
+
+    - name: Set up Ruby and Bundler
+      if: steps.tools.outputs.bundler == 'true' && inputs.setup-bundler == 'true'
+      uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+      with:
+        ruby-version: ${{ inputs.ruby-version }}
+        bundler: ${{ inputs.bundler-version }}
+        bundler-cache: false
+
+    - name: Set up rustup
+      if: steps.tools.outputs.rustup == 'true' && inputs.setup-rustup == 'true'
+      uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
+      env:
+        RUSTUP_TOOLCHAIN: ${{ steps.tools.outputs.cargo-toolchain }}
+      with:
+        toolchain: ${{ steps.tools.outputs.cargo-toolchain }}
+        cache: false
+        matcher: false
+        override: false
+
     - name: Update lockfiles
       id: maintenance
       shell: bash
       env:
         ACTION_DIRECTORY: ${{ steps.runtime.outputs.directory }}
+        INPUT_SETUP_YARN: ${{ inputs.setup-yarn }}
         INPUT_SETUP_PNPM: ${{ inputs.setup-pnpm }}
         INPUT_FILES: ${{ inputs.files }}
         INPUT_MINIMUM-RELEASE-AGE: ${{ inputs.minimum-release-age }}

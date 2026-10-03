@@ -82,27 +82,6 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-
-      - uses: ruby/setup-ruby@a0102e0972be65f351c307e2d64b9314a57c8073 # v1.324.0
-        with:
-          ruby-version: '4.0'
-          bundler: '4.0.21'
-
-      - name: Set up package managers
-        run: | # zizmor: ignore[adhoc-packages,github-env] -- Pinned tools and PATH changes run only in the trusted schedule/dispatch job.
-          npm install --prefix .tmp/tools --ignore-scripts @yarnpkg/cli-dist@4.18.0
-          python3 -m venv .tmp/tools/python
-          .tmp/tools/python/bin/pip install uv==0.12.17
-          echo "$PWD/.tmp/tools/node_modules/.bin" >> "$GITHUB_PATH"
-          echo "$PWD/.tmp/tools/python/bin" >> "$GITHUB_PATH"
-
       - name: Update selected lockfiles
         id: maintenance
         uses: knu/lockfile-maintenance-action@v1 # zizmor: ignore[unpinned-uses] -- Follow the v1 release series in this example.
