@@ -63,6 +63,44 @@ snapshots:
   assert.deepEqual([...versions.get('archive')], ['3.0.0']);
 });
 
+test('pnpm reads project versions from the last document and excludes env packages', async () => {
+  const lockfile = (pnpm, example) => `---
+lockfileVersion: '9.0'
+importers:
+  .:
+    packageManagerDependencies:
+      pnpm:
+        version: ${pnpm}
+packages:
+  pnpm@${pnpm}: {}
+  example@9.0.0: {}
+---
+lockfileVersion: '9.0'
+importers:
+  .:
+    dependencies:
+      example:
+        version: ${example}
+packages:
+  example@${example}: {}
+`;
+  const before = await packageVersions('pnpm', lockfile('12.8.1', '1.0.0'));
+  const after = await packageVersions('pnpm', lockfile('12.8.2', '1.1.0'));
+  assert.deepEqual([...before], [['example', new Set(['1.0.0'])]]);
+  assert.deepEqual(versionChanges(before, after), [
+    { name: 'example', from: ['1.0.0'], to: ['1.1.0'] },
+  ]);
+});
+
+test('pnpm rejects syntax errors in either document and a missing project version', async () => {
+  const valid = "lockfileVersion: '9.0'\npackages: {}\n";
+  const invalid = "lockfileVersion: '9.0'\npackages: [\n";
+  for (const contents of [`${invalid}---\n${valid}`, `${valid}---\n${invalid}`])
+    await assert.rejects(packageVersions('pnpm', contents), { name: 'YAMLParseError' });
+  for (const contents of ['', `${valid}---\npackages: {}\n`, `${valid}---\n`])
+    await assert.rejects(packageVersions('pnpm', contents), /missing lockfileVersion/);
+});
+
 test('Yarn groups descriptors and uses resolved names for aliases and patched packages', async () => {
   const versions = await packageVersions(
     'yarn',

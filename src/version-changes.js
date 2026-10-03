@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { parse as parseToml } from 'smol-toml';
-import { parse as parseYaml } from 'yaml';
+import { parseAllDocuments } from 'yaml';
 import { parseSyml } from '@yarnpkg/parsers';
 import { parse as parseDependencyPath } from '@pnpm/dependency-path';
 import semver from 'semver';
@@ -48,7 +48,10 @@ export async function packageVersions(manager, contents, context) {
       break;
     }
     case 'pnpm': {
-      const data = parseYaml(contents);
+      const documents = parseAllDocuments(contents);
+      for (const document of documents) if (document.errors.length) throw document.errors[0];
+      // pnpm stores the optional environment lockfile before the project lockfile.
+      const data = documents.at(-1)?.toJS();
       if (!data?.lockfileVersion) throw new Error('missing lockfileVersion');
       packages = Object.entries(data.packages ?? {}).map(([key, value]) => {
         const parsed = parseDependencyPath(key.replace(/^\//, ''));
