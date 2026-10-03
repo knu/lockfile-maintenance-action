@@ -82,11 +82,11 @@ export function rebaseRequest(eventName, event) {
 }
 
 function githubApi(env, request) {
-  return async (route, body) => {
+  return async (route, body, method) => {
     const response = await request(
       `${env.GITHUB_API_URL ?? 'https://api.github.com'}/repos/${env.GITHUB_REPOSITORY}/${route}`,
       {
-        method: body === undefined ? 'GET' : 'POST',
+        method: method ?? (body === undefined ? 'GET' : 'POST'),
         headers: {
           Authorization: `Bearer ${env.INPUT_TOKEN}`,
           Accept: 'application/vnd.github+json',
@@ -100,10 +100,29 @@ function githubApi(env, request) {
     );
     if (!response.ok) {
       await response.body?.cancel();
+      if (method === 'DELETE' && response.status === 404) return;
       throw new Error(`rebase request failed (HTTP ${response.status})`);
     }
     return response.status === 204 ? undefined : response.json();
   };
+}
+
+async function finishReaction(api, comment, content) {
+  const route = `issues/comments/${comment}/reactions`;
+  const result = await api(route, { content });
+  if (!Number.isSafeInteger(result?.user?.id) || result.user.id < 1)
+    throw new Error('invalid reaction author');
+  for (let page = 1; ; page++) {
+    const items = await api(`${route}?content=%2B1&per_page=100&page=${page}`);
+    if (!Array.isArray(items)) throw new Error('invalid reactions response');
+    const ack = items.find((item) => item.content === '+1' && item.user?.id === result.user.id);
+    if (ack) {
+      if (!Number.isSafeInteger(ack.id) || ack.id < 1) throw new Error('invalid reaction ID');
+      await api(`${route}/${ack.id}`, undefined, 'DELETE');
+      return;
+    }
+    if (items.length < 100) return;
+  }
 }
 
 export async function dispatchRebase(
@@ -136,7 +155,8 @@ export async function dispatchRebase(
   if (env.GITHUB_EVENT_NAME === 'issue_comment' && (!Number.isSafeInteger(comment) || comment < 1))
     throw new Error('invalid request comment');
   const reaction = (content) => api(`issues/comments/${comment}/reactions`, { content });
-  if (comment) await reaction('eyes');
+  if (comment) await reaction('+1');
+  let completed = false;
   try {
     const track = comment && env.INPUT_WAIT_FOR_COMPLETION === 'true';
     const run = await api(`actions/workflows/${encode(workflow)}/dispatches`, {
@@ -151,7 +171,12 @@ export async function dispatchRebase(
       for (let attempt = 0; ; attempt++) {
         const result = await api(`actions/runs/${run.workflow_run_id}`);
         if (result.status === 'completed') {
-          await reaction(result.conclusion === 'success' ? '+1' : 'confused');
+          completed = true;
+          await finishReaction(
+            api,
+            comment,
+            result.conclusion === 'success' ? 'hooray' : 'confused',
+          );
           break;
         }
         if (attempt === 270) throw new Error('timed out waiting for maintenance');
@@ -159,7 +184,7 @@ export async function dispatchRebase(
       }
     }
   } catch (error) {
-    if (comment) await reaction('confused');
+    if (comment && !completed) await finishReaction(api, comment, 'confused');
     throw error;
   }
   return true;
@@ -181,6 +206,6 @@ export async function finishRebase(env, request = fetch) {
   if (source.issue_url !== issueUrl || !hasRebaseCommand(source.body))
     throw new Error('rebase request comment does not match the PR');
   const succeeded = env.UPDATE_OUTCOME === 'success' && env.UPDATED_PULL_REQUEST === number;
-  await api(`issues/comments/${comment}/reactions`, { content: succeeded ? '+1' : 'confused' });
+  await finishReaction(api, comment, succeeded ? 'hooray' : 'confused');
   return true;
 }

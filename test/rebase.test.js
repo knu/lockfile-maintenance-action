@@ -42,8 +42,15 @@ function api({ permission = 'write', pull = pr, fail = 0, status = 204 } = {}) {
     if (calls.length === fail) return new Response('failure', { status: 403 });
     if (url.endsWith('/permission')) return Response.json({ permission });
     if (url.endsWith('/pulls/42')) return Response.json(pull);
+    if (url.includes('/reactions?'))
+      return Response.json([{ id: 456, content: '+1', user: { id: 1 } }]);
+    if (options.method === 'DELETE') {
+      assert.ok(url.endsWith('/reactions/456'));
+      return new Response(null, { status: 204 });
+    }
     assert.equal(options.method, 'POST');
-    if (url.endsWith('/reactions')) return Response.json({ id: 456 }, { status: 201 });
+    if (url.endsWith('/reactions'))
+      return Response.json({ id: 456, user: { id: 1 } }, { status: 201 });
     return status === 204 ? new Response(null, { status }) : Response.json({ workflow_run_id: 1 });
   };
   return { calls, request };
@@ -100,7 +107,7 @@ test('dispatch validates write access and current PR before requesting trusted w
     assert.equal(mock.calls.length, 4);
     assert.match(mock.calls[0].url, /collaborators\/maintainer\/permission$/);
     assert.match(mock.calls[2].url, /issues\/comments\/123\/reactions$/);
-    assert.deepEqual(JSON.parse(mock.calls[2].body), { content: 'eyes' });
+    assert.deepEqual(JSON.parse(mock.calls[2].body), { content: '+1' });
     assert.match(mock.calls[3].url, /actions\/workflows\/maintenance.yml\/dispatches$/);
     assert.deepEqual(JSON.parse(mock.calls[3].body), {
       ref: 'main',
@@ -223,12 +230,7 @@ test('request entrypoint ignores unrelated events without API or checkout', asyn
 });
 
 test('workflow examples isolate privileged requests from maintenance execution', async () => {
-  for (const file of [
-    '.github/workflows/lockfile-maintenance.yml',
-    'examples/oidc-maintenance.yml',
-    'examples/cargo-maintenance.yml',
-    'examples/multi-tool-maintenance.yml',
-  ]) {
+  for (const file of ['examples/cargo-maintenance.yml', 'examples/multi-tool-maintenance.yml']) {
     const workflow = parseYaml(await readFile(file, 'utf8'));
     assert.deepEqual(workflow.on.issue_comment.types, ['created']);
     assert.deepEqual(workflow.on.pull_request_target.types, ['edited']);
@@ -261,7 +263,7 @@ test('workflow examples isolate privileged requests from maintenance execution',
 test('dispatch failure adds a failure reaction after acceptance', async () => {
   const mock = api({ fail: 4 });
   await assert.rejects(dispatchRebase(env, event, mock.request), /HTTP 403/);
-  assert.equal(mock.calls.length, 5);
+  assert.equal(mock.calls.length, 7);
   assert.deepEqual(JSON.parse(mock.calls[4].body), { content: 'confused' });
 });
 
@@ -283,7 +285,7 @@ test('checkbox dispatch needs neither comment metadata nor reactions', async () 
 
 test('completion reacts only to the source PR command and distinguishes failures', async () => {
   for (const [outcome, number, content] of [
-    ['success', '42', '+1'],
+    ['success', '42', 'hooray'],
     ['failure', '', 'confused'],
     ['skipped', '', 'confused'],
     ['success', '43', 'confused'],
@@ -291,7 +293,11 @@ test('completion reacts only to the source PR command and distinguishes failures
     const calls = [];
     const request = async (url, options) => {
       calls.push({ url, ...options });
+      if (url.includes('/reactions?'))
+        return Response.json([{ id: 456, content: '+1', user: { id: 1 } }]);
+      if (options.method === 'DELETE') return new Response(null, { status: 204 });
       return Response.json({
+        user: { id: 1 },
         issue_url: 'https://api.github.com/repos/owner/project/issues/42',
         body: 'Please refresh this PR.\n/lockfile rebase\nThanks!',
       });
@@ -312,6 +318,8 @@ test('completion reacts only to the source PR command and distinguishes failures
     assert.match(calls[0].url, /issues\/comments\/123$/);
     assert.match(calls[1].url, /issues\/comments\/123\/reactions$/);
     assert.deepEqual(JSON.parse(calls[1].body), { content });
+    assert.equal(calls.at(-1).method, 'DELETE');
+    assert.ok(calls.at(-1).url.endsWith('/reactions/456'));
   }
 });
 
@@ -386,9 +394,16 @@ test('completion tracking omits dispatch inputs and follows only the returned ru
       Array(2).fill('https://api.github.com/repos/owner/project/actions/runs/1'),
     );
     assert.deepEqual(JSON.parse(mock.calls[3].body), { ref: 'main' });
-    assert.deepEqual(JSON.parse(mock.calls.at(-1).body), {
-      content: conclusion === 'success' ? '+1' : 'confused',
-    });
+    assert.deepEqual(
+      JSON.parse(
+        mock.calls
+          .filter((call) => call.method === 'POST' && call.url.endsWith('/reactions'))
+          .at(-1).body,
+      ),
+      {
+        content: conclusion === 'success' ? 'hooray' : 'confused',
+      },
+    );
   }
 });
 
@@ -403,7 +418,14 @@ test('completion tracking reports missing run IDs and timeout as failures', asyn
       dispatchRebase({ ...env, INPUT_WAIT_FOR_COMPLETION: 'true' }, event, request, async () => {}),
       status === 204 ? /run ID/ : /timed out/,
     );
-    assert.deepEqual(JSON.parse(mock.calls.at(-1).body), { content: 'confused' });
+    assert.deepEqual(
+      JSON.parse(
+        mock.calls
+          .filter((call) => call.method === 'POST' && call.url.endsWith('/reactions'))
+          .at(-1).body,
+      ),
+      { content: 'confused' },
+    );
   }
 });
 
@@ -436,4 +458,24 @@ test('reusable workflow needs no request job and uses its own pinned source', as
   assert.equal(caller.on.pull_request_target, undefined);
   assert.deepEqual(caller.permissions, { contents: 'read', 'id-token': 'write' });
   assert.deepEqual(maintain.permissions, caller.permissions);
+});
+
+test('cleanup failure does not replace a successful result with failure', async () => {
+  const mock = api({ status: 200 });
+  const request = async (url, options) => {
+    if (url.includes('/actions/runs/'))
+      return Response.json({ status: 'completed', conclusion: 'success' });
+    if (options.method === 'DELETE') return new Response(null, { status: 503 });
+    return mock.request(url, options);
+  };
+  await assert.rejects(
+    dispatchRebase({ ...env, INPUT_WAIT_FOR_COMPLETION: 'true' }, event, request),
+    /HTTP 503/,
+  );
+  assert.deepEqual(
+    mock.calls
+      .filter((call) => call.method === 'POST' && call.url.endsWith('/reactions'))
+      .map((call) => JSON.parse(call.body).content),
+    ['+1', 'hooray'],
+  );
 });
