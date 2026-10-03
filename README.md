@@ -229,7 +229,9 @@ Comments require `issue_comment`; checkbox edits require `pull_request_target`. 
 ```yaml
 jobs:
   request-rebase:
-    if: github.event_name == 'issue_comment' || github.event_name == 'pull_request_target'
+    if: >-
+      github.event.sender.type == 'User' &&
+      (github.event_name == 'issue_comment' || github.event_name == 'pull_request_target')
     runs-on: ubuntu-latest
     permissions:
       actions: write
