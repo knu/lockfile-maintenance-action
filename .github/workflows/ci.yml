@@ -56,6 +56,7 @@ jobs:
         with:
           files: /Cargo.lock
           working-directory: .tmp/smoke
+          auth: token
           create-pull-request: false
 
       - name: Verify action outputs
@@ -71,6 +72,7 @@ jobs:
         uses: ./ # zizmor: ignore[self-repository] -- Exercise this checkout, including PR changes.
         with:
           working-directory: .tmp/smoke
+          auth: token
           create-pull-request: false
 
       - name: Verify idempotence
@@ -88,6 +90,7 @@ jobs:
         uses: ./ # zizmor: ignore[self-repository] -- Exercise automatic setup from this checkout.
         with:
           working-directory: .tmp/tool-smoke
+          auth: token
           create-pull-request: false
 
       - name: Verify automatic tool setup outputs
@@ -98,7 +101,7 @@ jobs:
           test "$CHANGED" = true
           test "$LOCKFILES" = '[".tmp/tool-smoke/bundler/Gemfile.lock",".tmp/tool-smoke/uv/uv.lock",".tmp/tool-smoke/yarn/yarn.lock"]'
 
-  update-v1:
+  update-v2:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -106,7 +109,7 @@ jobs:
     permissions:
       contents: write
     concurrency:
-      group: update-v1
+      group: update-v2
       cancel-in-progress: false
     steps:
       - name: Harden Runner
@@ -118,9 +121,9 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-          persist-credentials: true # zizmor: ignore[artipacked] -- This job only pushes the tested commit to v1.
+          persist-credentials: true # zizmor: ignore[artipacked] -- This job only pushes the tested commit to v2.
 
-      - name: Update v1 from the tested main commit
+      - name: Update v2 from the tested main commit
         shell: bash
         env:
           TESTED_SHA: ${{ github.sha }}
@@ -130,4 +133,4 @@ jobs:
             echo 'main has moved; skipping this older run.'
             exit 0
           fi
-          git push --no-follow-tags origin HEAD:refs/heads/v1
+          git push --no-follow-tags origin HEAD:refs/heads/v2

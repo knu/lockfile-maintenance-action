@@ -44,7 +44,7 @@ inputs:
     default: 'true'
   auth:
     description: Authentication mode (token or oidc). OIDC requires id-token write permission and broker authorization.
-    default: token
+    default: oidc
   token:
     description: Token for checkout and PR creation. Requires contents read access, plus contents and pull-requests write access for PR creation.
     default: ${{ github.token }}

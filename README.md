@@ -32,9 +32,8 @@ permissions:
   id-token: write
 jobs:
   maintenance:
-    uses: knu/lockfile-maintenance-action/.github/workflows/maintenance.yml@v1 # zizmor: ignore[unpinned-uses] -- Follow the tested v1 release series.
+    uses: knu/lockfile-maintenance-action/.github/workflows/maintenance.yml@v2 # zizmor: ignore[unpinned-uses] -- Follow the tested v2 release series.
     with:
-      auth: oidc
       files: /pnpm-lock.yaml
 ```
 
@@ -42,7 +41,7 @@ The reusable workflow supplies Harden-Runner, automatic tool setup, and update s
 
 For checkbox and comment requests, enable [App-based rebase handling](#app-based-rebase-handling).  The App dispatches this workflow only for valid requests and tracks completion outside Actions.  The caller needs only `schedule` and `workflow_dispatch`; unrelated PR activity creates no maintenance workflow runs.
 
-The reusable workflow defaults to `auth: oidc`.  For token authentication, use `auth: token` and pass a write token as `secrets.token`; its GITHUB_TOKEN intentionally has only read access to contents.  Tool selection, minimum release age, branch/base, labels, working directory, and setup options are available as workflow inputs.  The outputs are `pull-request-url` and `changed`.  GitHub.com is required for the self-repository syntax and dispatch run tracking.
+Both the composite Action and the reusable workflow default to OIDC authentication.  For token authentication, use `auth: token` and pass a write token as `secrets.token`; its GITHUB_TOKEN intentionally has only read access to contents.  Tool selection, minimum release age, branch/base, labels, working directory, and setup options are available as workflow inputs.  The outputs are `pull-request-url` and `changed`.  GitHub.com is required for the self-repository syntax and dispatch run tracking.
 
 ### Using the composite action directly
 
@@ -60,8 +59,8 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+  id-token: write
 
 jobs:
   update:
@@ -71,19 +70,22 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: knu/lockfile-maintenance-action@v1 # zizmor: ignore[unpinned-uses] -- Follow the v1 release series in this example.
+      - uses: knu/lockfile-maintenance-action@v2 # zizmor: ignore[unpinned-uses] -- Follow the v2 release series in this example.
         id: maintenance
         with:
           files: /Cargo.lock
           minimum-release-age: 3 days
-          token: ${{ secrets.LOCKFILE_MAINTENANCE_TOKEN }}
 ```
 
-Configure `LOCKFILE_MAINTENANCE_TOKEN` with a fine-grained personal access token or supply a GitHub App installation token with contents and pull requests write access.  These allow the consuming repository's PR CI to run without the approval required for [PR workflows triggered by `GITHUB_TOKEN`](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs).
+Install the Lockfile Maintenance App for the default OIDC authentication.  To use token authentication instead, set `auth: token` and pass `token` with a fine-grained personal access token or supply a GitHub App installation token with contents and pull requests write access.  These allow the consuming repository's PR CI to run without the approval required for [PR workflows triggered by `GITHUB_TOKEN`](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs).
 
-See [the Cargo workflow](examples/cargo-maintenance.yml) and [the multi-tool workflow](examples/multi-tool-maintenance.yml) for complete examples.  The default token is `github.token`; when using it, grant `contents: write` and `pull-requests: write`, and enable GitHub Actions to create pull requests in repository settings.
+See [the Cargo workflow](examples/cargo-maintenance.yml) and [the multi-tool workflow](examples/multi-tool-maintenance.yml) for complete examples.  With `auth: token`, the default token is `github.token`; when using it, grant `contents: write` and `pull-requests: write`, and enable GitHub Actions to create pull requests in repository settings.
 
-`@v1` follows the latest `main` commit that passes this repository's CI.  The Action is tested on Linux runners.
+`@v2` follows the latest `main` commit that passes this repository's CI.  The Action is tested on Linux runners.
+
+### Migrating from v1
+
+Version 2 defaults to OIDC.  Install the Lockfile Maintenance App and grant `id-token: write`, or add `auth: token` to keep using an existing token or `github.token`.  A `token` input alone no longer selects token authentication.  For local-only updates without the App, use `auth: token` with `create-pull-request: false`.  The `v1` branch stays on its last compatible commit.
 
 ### Supported tools
 
@@ -116,7 +118,7 @@ The Action sets up Node.js 24 for its own runtime and installs its runtime depen
 
   Authentication mode: `token` uses the supplied `token` or `github.token`; `oidc` exchanges a GitHub Actions identity token for a repository-scoped installation token from the Lockfile Maintenance App.  OIDC requires `id-token: write`, an App installation, and authorization by the broker.  It never falls back to another credential on failure.
 
-  Default: `token`
+  Default: `oidc`
 
 - `create-pull-request` (string, optional)
 
@@ -244,7 +246,7 @@ If no changes are needed, no new PR is created.  The PR integration also closes 
 The PR integration cannot accept commas or newlines in selected file paths.  For these paths, or for a custom test/commit/PR workflow, disable PR creation:
 
 ``` yaml
-- uses: knu/lockfile-maintenance-action@v1
+- uses: knu/lockfile-maintenance-action@v2
   with:
     create-pull-request: false
 ```
@@ -318,7 +320,7 @@ jobs:
       - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
-      - uses: knu/lockfile-maintenance-action/request-rebase@v1 # zizmor: ignore[unpinned-uses] -- Follow the v1 release series in this example.
+      - uses: knu/lockfile-maintenance-action/request-rebase@v2 # zizmor: ignore[unpinned-uses] -- Follow the v2 release series in this example.
 
   update:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -329,7 +331,7 @@ jobs:
     # Add issues: write to this job's existing permissions.
     # Keep existing setup steps, then forward the request inputs:
     steps:
-      - uses: knu/lockfile-maintenance-action@v1 # zizmor: ignore[unpinned-uses] -- Follow the v1 release series in this example.
+      - uses: knu/lockfile-maintenance-action@v2 # zizmor: ignore[unpinned-uses] -- Follow the v2 release series in this example.
         with:
           request-comment: ${{ inputs.request-comment }}
           request-pull-request: ${{ inputs.request-pull-request }}
@@ -358,7 +360,7 @@ The checkbox resets when maintenance successfully updates the PR body.  After a 
 
 ## OIDC authentication
 
-Install the [Lockfile Maintenance App](https://github.com/apps/lockfile-maintenance) and select the repositories to maintain.  No registration with the broker operator is needed.  Add `.github/workflows/lockfile-maintenance.yml` to the repository's default branch and enable `auth: oidc` with `id-token: write`:
+Install the [Lockfile Maintenance App](https://github.com/apps/lockfile-maintenance) and select the repositories to maintain.  No registration with the broker operator is needed.  Add `.github/workflows/lockfile-maintenance.yml` to the repository's default branch and grant `id-token: write` for the default OIDC authentication:
 
 ``` yaml
 name: Lockfile maintenance
@@ -376,9 +378,8 @@ jobs:
   maintain:
     runs-on: ubuntu-latest
     steps:
-      - uses: knu/lockfile-maintenance-action@v1
+      - uses: knu/lockfile-maintenance-action@v2
         with:
-          auth: oidc
           files: /Cargo.lock
           minimum-release-age: 3 days
 ```
@@ -411,9 +412,8 @@ gh workflow run lockfile-maintenance.yml --ref v1
 On that branch, configure the Action to update the same base and use a separate PR branch:
 
 ```yaml
-- uses: knu/lockfile-maintenance-action@v1
+- uses: knu/lockfile-maintenance-action@v2
   with:
-    auth: oidc
     base: v1
     branch: automation/lockfile-maintenance-v1
 ```

@@ -26,8 +26,7 @@ jobs:
           egress-policy: audit
 
       - name: Update lockfile and create a pull request
-        uses: knu/lockfile-maintenance-action@v1 # zizmor: ignore[unpinned-uses] -- Follow the v1 release series in this example.
+        uses: knu/lockfile-maintenance-action@v2 # zizmor: ignore[unpinned-uses] -- Follow the v2 release series in this example.
         with:
-          auth: oidc
           files: /Cargo.lock
           minimum-release-age: 3 days

@@ -8,7 +8,6 @@ permissions:
   id-token: write
 jobs:
   maintenance:
-    uses: knu/lockfile-maintenance-action/.github/workflows/maintenance.yml@v1 # zizmor: ignore[unpinned-uses] -- Follow the tested v1 release series.
+    uses: knu/lockfile-maintenance-action/.github/workflows/maintenance.yml@v2 # zizmor: ignore[unpinned-uses] -- Follow the tested v2 release series.
     with:
-      auth: oidc
       files: /pnpm-lock.yaml

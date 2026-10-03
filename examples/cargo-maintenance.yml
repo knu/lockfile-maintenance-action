@@ -47,7 +47,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: knu/lockfile-maintenance-action/request-rebase@v1 # zizmor: ignore[unpinned-uses] -- Follow the tested v1 release series.
+      - uses: knu/lockfile-maintenance-action/request-rebase@v2 # zizmor: ignore[unpinned-uses] -- Follow the tested v2 release series.
 
   update:
     permissions:
@@ -70,10 +70,11 @@ jobs:
 
       - name: Update dependencies
         id: maintenance
-        uses: knu/lockfile-maintenance-action@v1 # zizmor: ignore[unpinned-uses] -- Follow the v1 release series in this example.
+        uses: knu/lockfile-maintenance-action@v2 # zizmor: ignore[unpinned-uses] -- Follow the v2 release series in this example.
         with:
           files: /Cargo.lock
           minimum-release-age: 3 days
+          auth: token
           token: ${{ secrets.LOCKFILE_MAINTENANCE_TOKEN }}
           request-comment: ${{ inputs.request-comment }}
           request-pull-request: ${{ inputs.request-pull-request }}
