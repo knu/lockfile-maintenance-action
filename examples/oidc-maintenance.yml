@@ -1,55 +1,22 @@
+# Enable App rebase handling with rebase: true in .github/lockfile-maintenance-auth.yml.
+
 # The broker must be deployed and authorize this repository/workflow before use.
 # Install the Lockfile Maintenance GitHub App on the repository first.
 name: Lockfile maintenance
 
-on: # zizmor: ignore[dangerous-triggers] -- PR events only validate and dispatch; no PR checkout or execution.
-  workflow_dispatch:
-    inputs:
-      request-comment:
-        description: Rebase request comment ID (set by the request job).
-        type: string
-        default: ''
-      request-pull-request:
-        description: Rebase request PR number (set by the request job).
-        type: string
-        default: ''
-  issue_comment:
-    types: [created]
-  pull_request_target:
-    types: [edited]
-
+on:
+  workflow_dispatch: {}
 permissions:
   contents: read
 
 jobs:
-  request-rebase:
-    if: >-
-      github.event.sender.type == 'User' &&
-      ((github.event_name == 'issue_comment' && github.event.issue.state == 'open') ||
-       (github.event_name == 'pull_request_target' && github.event.pull_request.state == 'open'))
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      actions: write
-      issues: write
-      pull-requests: read
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
-        with:
-          egress-policy: audit
-
-      - uses: knu/lockfile-maintenance-action/request-rebase@v1 # zizmor: ignore[unpinned-uses] -- Follow the tested v1 release series.
-
   update:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     concurrency:
       group: lockfile-maintenance
       cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      issues: write
       contents: read
       id-token: write
     steps:
@@ -61,8 +28,6 @@ jobs:
       - name: Update lockfile and create a pull request
         uses: knu/lockfile-maintenance-action@v1 # zizmor: ignore[unpinned-uses] -- Follow the v1 release series in this example.
         with:
-          request-comment: ${{ inputs.request-comment }}
-          request-pull-request: ${{ inputs.request-pull-request }}
           auth: oidc
           files: /Cargo.lock
           minimum-release-age: 3 days
