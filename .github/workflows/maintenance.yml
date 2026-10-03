@@ -100,27 +100,6 @@ on:
 permissions:
   contents: read
 jobs:
-  request-rebase:
-    if: >-
-      github.event.sender.type == 'User' &&
-      ((github.event_name == 'issue_comment' && github.event.issue.state == 'open') ||
-       (github.event_name == 'pull_request_target' && github.event.pull_request.state == 'open'))
-    runs-on: ubuntu-latest
-    timeout-minutes: 55
-    permissions:
-      actions: write
-      issues: write
-      pull-requests: read
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
-        with:
-          egress-policy: audit
-      - uses: $/request-rebase
-        with:
-          branch: ${{ inputs.branch }}
-          base: ${{ inputs.base || github.event.repository.default_branch }}
-          wait-for-completion: true
   maintain:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -130,7 +109,6 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
-      issues: write
       id-token: write
     outputs:
       pull-request-url: ${{ steps.maintenance.outputs.pull-request-url }}

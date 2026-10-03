@@ -407,18 +407,12 @@ test('completion tracking reports missing run IDs and timeout as failures', asyn
   }
 });
 
-test('reusable workflow keeps request permissions separate and uses its own pinned source', async () => {
+test('reusable workflow needs no request job and uses its own pinned source', async () => {
   const workflow = parseYaml(
     await readFile(new URL('../.github/workflows/maintenance.yml', import.meta.url), 'utf8'),
   );
-  const request = workflow.jobs['request-rebase'];
   const maintain = workflow.jobs.maintain;
-  assert.deepEqual(request.permissions, {
-    actions: 'write',
-    issues: 'write',
-    'pull-requests': 'read',
-  });
-  assert.match(request.if, /sender.type == 'User'/);
+  assert.deepEqual(Object.keys(workflow.jobs), ['maintain']);
   assert.equal(
     maintain.if,
     "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
@@ -426,14 +420,7 @@ test('reusable workflow keeps request permissions separate and uses its own pinn
   assert.equal(maintain.permissions['id-token'], 'write');
   assert.equal(maintain.permissions.contents, 'read');
   assert.equal(workflow.concurrency, undefined);
-  assert.equal(request.concurrency, undefined);
   assert.equal(maintain.concurrency['cancel-in-progress'], false);
-  const handler = request.steps.find((step) => step.uses === '$/request-rebase');
-  assert.equal(handler.with['wait-for-completion'], true);
-  assert.equal(
-    request.steps.some((step) => step.uses?.startsWith('actions/checkout')),
-    false,
-  );
   const action = maintain.steps.find((step) => step.id === 'maintenance');
   assert.equal(action.uses, '$/');
   assert.equal(action.with['request-comment'], undefined);
@@ -445,6 +432,8 @@ test('reusable workflow keeps request permissions separate and uses its own pinn
   );
   assert.equal(Object.keys(caller.jobs).length, 1);
   assert.equal(caller.on.workflow_dispatch, null);
-  assert.deepEqual(caller.on.issue_comment.types, ['created']);
-  assert.deepEqual(caller.on.pull_request_target.types, ['edited']);
+  assert.equal(caller.on.issue_comment, undefined);
+  assert.equal(caller.on.pull_request_target, undefined);
+  assert.deepEqual(caller.permissions, { contents: 'read', 'id-token': 'write' });
+  assert.deepEqual(maintain.permissions, caller.permissions);
 });

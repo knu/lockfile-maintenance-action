@@ -23,21 +23,12 @@ For normal use, call the reusable workflow.  Install the [Lockfile Maintenance A
 
 ```yaml
 name: Lockfile maintenance
-on: # zizmor: ignore[dangerous-triggers] -- The reusable workflow validates requests and only updates through trusted dispatch.
+on:
   schedule:
     - cron: 0 0 * * 5
   workflow_dispatch:
-  issue_comment:
-    types:
-      - created
-  pull_request_target:
-    types:
-      - edited
 permissions:
   contents: read
-  actions: write
-  issues: write
-  pull-requests: read
   id-token: write
 jobs:
   maintenance:
@@ -47,9 +38,9 @@ jobs:
       files: /pnpm-lock.yaml
 ```
 
-The caller owns the event subscriptions and grants the permissions shown above.  The reusable workflow supplies Harden-Runner, separate request and update jobs, automatic tool setup, serialization, and reactions.  It uses the same commit of its bundled actions through GitHub's `$/` syntax.  See [the complete caller example](examples/reusable-maintenance.yml).
+The reusable workflow supplies Harden-Runner, automatic tool setup, and update serialization.  It uses the same commit of its bundled action through GitHub's `$/` syntax.  See [the complete caller example](examples/reusable-maintenance.yml).
 
-Keep `workflow_dispatch` enabled, without request-metadata inputs.  Comments dispatch the caller workflow and keep the request job running while it polls that exact run for completion, for up to about 45 minutes.  Success adds 👍; failure, cancellation, or a wait timeout adds 😕.  A timeout does not cancel the update.  Checkbox requests dispatch and return immediately.  Do not add caller-level concurrency that serializes the request run with the dispatched run; serialization belongs to the update job.
+For checkbox and comment requests, enable [App-based rebase handling](#app-based-rebase-handling).  The App dispatches this workflow only for valid requests and tracks completion outside Actions.  The caller needs only `schedule` and `workflow_dispatch`; unrelated PR activity creates no maintenance workflow runs.
 
 The reusable workflow defaults to `auth: oidc`.  For token authentication, use `auth: token` and pass a write token as `secrets.token`; its GITHUB_TOKEN intentionally has only read access to contents.  Tool selection, minimum release age, branch/base, labels, working directory, and setup options are available as workflow inputs.  The outputs are `pull-request-url` and `changed`.  GitHub.com is required for the self-repository syntax and dispatch run tracking.
 
@@ -264,7 +255,33 @@ A PR creation failure fails the Action; the file-update rollback applies to depe
 
 Each maintenance PR includes a rebase checkbox, instructions to comment `/lockfile rebase`, and a link to the workflow's Actions page.  Rebase requests regenerate the selected lockfiles from the latest base and update the same PR.  Dependency versions may change during resolution.  The reserved maintenance branch must not contain manual changes you need to preserve.
 
-To enable both PR controls, add these subscriptions to the consuming workflow's `on` section:
+#### App-based rebase handling
+
+For PRs created by the Lockfile Maintenance App, put this in `.github/lockfile-maintenance-auth.yml` on the default branch:
+
+```yaml
+rebase: true
+```
+
+Keep `workflow_dispatch` in `.github/workflows/lockfile-maintenance.yml`.  Remove `issue_comment` and `pull_request_target` subscriptions and the request job from the maintenance workflow before enabling App handling, so requests are not dispatched twice.  Existing App installations must approve the added Actions and Issues write permissions.
+
+The App accepts new `/lockfile rebase` comments and unchecked-to-checked transitions from users with repository write access.  It checks the current PR state, author, repository, and branches before dispatch.  Comments receive 👀 before dispatch, then 👍 on success or 😕 on failure.  Completion is checked about once per minute, for up to two hours; this does not keep an Actions runner waiting.  If a dispatch result is unknown, the broker reports failure instead of retrying and risking a duplicate run.  Submit a new request after checking the workflow runs.
+
+The defaults are the `automation/lockfile-maintenance` PR branch and the repository default branch for both base and workflow execution.  To match custom workflow inputs, use:
+
+```yaml
+allowed_branches: [main, v1]
+rebase:
+  branch: automation/lockfile-maintenance-v1
+  base: v1
+  ref: v1
+```
+
+`ref` must be authorized by `allowed_branches`.  This configuration supports one maintenance target per repository.  Omit `rebase` or set it to `false` to disable App handling.
+
+#### Actions-based rebase handling
+
+For other bot identities or installations without App handling, use the composite action and a separate request job.  Add these subscriptions to the consuming workflow's `on` section:
 
 ```yaml
 on:
