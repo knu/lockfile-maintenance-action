@@ -97,8 +97,7 @@ jobs:
 
       - name: Set up package managers
         run: | # zizmor: ignore[adhoc-packages,github-env] -- Pinned tools and PATH changes run only in the trusted schedule/dispatch job.
-          npm install --prefix .tmp/tools --ignore-scripts pnpm@12.4.2 @yarnpkg/cli-dist@4.18.0
-          node .tmp/tools/node_modules/pnpm/install.js
+          npm install --prefix .tmp/tools --ignore-scripts @yarnpkg/cli-dist@4.18.0
           python3 -m venv .tmp/tools/python
           .tmp/tools/python/bin/pip install uv==0.12.17
           echo "$PWD/.tmp/tools/node_modules/.bin" >> "$GITHUB_PATH"

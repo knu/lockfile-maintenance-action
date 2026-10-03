@@ -1,8 +1,8 @@
-import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import { command, requireVersion } from '../command.js';
 import { prepareCargo, updateCargo } from './cargo.js';
 import { prepareNpm, updateNpm } from './npm.js';
+import { preparePnpm, updatePnpm } from './pnpm.js';
 
 export const managers = new Map([
   [
@@ -28,23 +28,8 @@ export const managers = new Map([
     {
       name: 'pnpm',
       manifest: 'package.json',
-      prepare: (context) => requireVersion('pnpm', '11.0.0', context),
-      async update(context) {
-        await rm(path.join(context.directory, 'pnpm-lock.yaml'));
-        await command(
-          'pnpm',
-          [
-            'install',
-            '--lockfile-only',
-            '--ignore-scripts',
-            '--no-frozen-lockfile',
-            `--config.minimum-release-age=${context.age.minutes}`,
-            '--config.minimum-release-age-strict=true',
-            '--config.minimum-release-age-ignore-missing-time=false',
-          ],
-          context,
-        );
-      },
+      prepare: preparePnpm,
+      update: updatePnpm,
     },
   ],
   [

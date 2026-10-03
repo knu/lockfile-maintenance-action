@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { main, run, temporaryDirectory, trackFiles } from '../helpers.js';
@@ -85,6 +85,7 @@ for (const scenario of ['npm', 'npm-installed', 'pnpm', 'yarn']) {
     const manifest = JSON.stringify({
       name: 'test-project',
       private: true,
+      ...(manager === 'pnpm' ? { packageManager: 'pnpm@12.4.2' } : {}),
       dependencies: { 'maint-fixture': '^1.0.0' },
     });
     await writeFile(path.join(workspace, 'package.json'), manifest);
@@ -107,6 +108,7 @@ for (const scenario of ['npm', 'npm-installed', 'pnpm', 'yarn']) {
       npm_config_audit: 'false',
       npm_config_fund: 'false',
       GITHUB_WORKSPACE: workspace,
+      RUNNER_TEMP: directory,
       GITHUB_OUTPUT: path.join(directory, 'output'),
       'INPUT_MINIMUM-RELEASE-AGE': '3 days',
       LOCKFILE_REPORT_PATH: path.join(directory, 'report.md'),
@@ -138,6 +140,10 @@ for (const scenario of ['npm', 'npm-installed', 'pnpm', 'yarn']) {
     await trackFiles(workspace);
     const result = await run(process.execPath, [main], { cwd: workspace, env });
     assert.equal(result.code, 0, result.stderr + result.stdout);
+    assert.equal(
+      (await readdir(directory)).some((name) => name.startsWith('lockfile-pnpm-')),
+      false,
+    );
     const report = await readFile(env.LOCKFILE_REPORT_PATH, 'utf8');
     assert.match(report, /<code>1\.0\.0<\/code> \| <code>1\.1\.0<\/code>/);
     const lockfile = { npm: 'package-lock.json', pnpm: 'pnpm-lock.yaml', yarn: 'yarn.lock' }[
@@ -151,6 +157,10 @@ for (const scenario of ['npm', 'npm-installed', 'pnpm', 'yarn']) {
     await writeFile(path.join(workspace, 'package.json'), manifest.replace('^1.0.0', '1.2.0'));
     const denied = await run(process.execPath, [main], { cwd: workspace, env });
     assert.equal(denied.code, 1, denied.stderr + denied.stdout);
+    assert.equal(
+      (await readdir(directory)).some((name) => name.startsWith('lockfile-pnpm-')),
+      false,
+    );
     assert.equal(await readFile(path.join(workspace, lockfile), 'utf8'), updated);
   });
 }

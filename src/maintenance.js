@@ -120,6 +120,8 @@ export async function maintainLockfile(env) {
       );
     }
     throw new Error(`${error.message}; original files restored`);
+  } finally {
+    for (const target of targets) await target.cleanup?.();
   }
   console.log(`${changed.length} of ${targets.length} lockfiles changed`);
 }

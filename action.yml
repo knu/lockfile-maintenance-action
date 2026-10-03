@@ -6,6 +6,9 @@ branding:
   color: green
 
 inputs:
+  setup-pnpm:
+    description: Automatically prepare pnpm for selected lockfiles. Set to false to use a manually installed pnpm.
+    default: 'true'
   request-comment:
     description: Rebase request comment ID forwarded from workflow_dispatch inputs.
     default: ''
@@ -47,7 +50,7 @@ inputs:
       Only Git-tracked files with supported lockfile names are considered.
       By default, selects all supported Git-tracked lockfiles, including subdirectories.
       Symlinks are not followed.
-      Matching no lockfiles is an error. Requires npm >=11.10; set up pnpm >=11, Yarn >=4.10,
+      Matching no lockfiles is an error. Requires npm >=11.10; pnpm is prepared automatically; set up Yarn >=4.10,
       uv >=0.9.17, or Bundler >=4.0.18 before use; Cargo installs a pinned nightly.
     default: |
       Cargo.lock
@@ -141,6 +144,7 @@ runs:
       shell: bash
       env:
         ACTION_DIRECTORY: ${{ steps.runtime.outputs.directory }}
+        INPUT_SETUP_PNPM: ${{ inputs.setup-pnpm }}
         INPUT_FILES: ${{ inputs.files }}
         INPUT_MINIMUM-RELEASE-AGE: ${{ inputs.minimum-release-age }}
         INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}
