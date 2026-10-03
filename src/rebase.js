@@ -34,8 +34,13 @@ export function rebaseInstructions(env) {
     '',
     `Check the box above or post a new PR comment with \`${rebaseCommand}\` on its own line.  Requires repository write access.`,
     '',
+    '<details>',
+    '<summary>Workflow requirements and manual fallback</summary>',
+    '',
     'The workflow must subscribe to `pull_request_target: types: [edited]` for the checkbox and `issue_comment: types: [created]` for comments, and use the reusable workflow or configure the request-rebase job.',
     `If these handlers are not configured, [open the maintenance workflow](<${workflowUrl(env)}>) and select **Run workflow** on the branch used for maintenance.  This requires \`workflow_dispatch\`.`,
+    '',
+    '</details>',
     '',
   ].join('\n');
 }
