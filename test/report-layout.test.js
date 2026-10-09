@@ -21,7 +21,7 @@ function files(body = 'Release notes') {
   }));
 }
 
-test('separate is the default, links both ways, and targets named anchors inside closed details', () => {
+test('separate is the default, links both ways, and targets IDs inside closed details', () => {
   const report = changeReport(files(), '3 days');
   assert.ok(report.indexOf('second/package') < report.indexOf('<details>'));
   assert.match(report, /\[<code>1.0.0<\/code>\]\(https:\/\/github.com\/org\/repo\/tree\/v1.0.0\)/);
@@ -29,13 +29,13 @@ test('separate is the default, links both ways, and targets named anchors inside
     report,
     /\[<code>1.1.0<\/code>\]\(https:\/\/github.com\/org\/repo\/releases\/tag\/v1.1.0\)/,
   );
-  assert.ok(!report.includes('<a id=') && !report.includes('<details open'));
+  assert.ok(!report.includes('<a name=') && !report.includes('<details open'));
   for (const index of [1, 2]) {
     assert.match(report, new RegExp(`\\[Release history\\]\\(#user-content-history-${index}-1\\)`));
     assert.match(
       report,
       new RegExp(
-        `<details>\\s*<summary>[^]*?</summary>\\s*<a name="user-content-history-${index}-1"></a>`,
+        `<details>\\s*<summary>[^]*?</summary>\\s*<a id="user-content-history-${index}-1"></a>`,
       ),
     );
     assert.match(
@@ -45,19 +45,17 @@ test('separate is the default, links both ways, and targets named anchors inside
   }
 });
 
-test('navigation fragments match anchor names locally and after GitHub prefixes them', () => {
+test('navigation fragments resolve to IDs used by GitHub scroll restoration', () => {
   const localTargets = [];
   const targets = [];
   const fragments = [];
   sanitizeHtml(new Marked({ gfm: true }).parse(changeReport(files(), '3 days')), {
     transformTags: {
       a(tagName, attribs) {
-        if (attribs.name) {
-          localTargets.push(attribs.name);
+        if (attribs.id) {
+          localTargets.push(attribs.id);
           targets.push(
-            attribs.name.startsWith('user-content-')
-              ? attribs.name
-              : `user-content-${attribs.name}`,
+            attribs.id.startsWith('user-content-') ? attribs.id : `user-content-${attribs.id}`,
           );
         }
         if (attribs.href?.startsWith('#')) fragments.push(attribs.href.slice(1));
@@ -96,7 +94,7 @@ for (const layout of ['separate', 'inline']) {
       assert.equal(report.match(/<details>/g)?.length, report.match(/<\/details>/g)?.length);
       assert.equal(report.match(/<table>/g)?.length, report.match(/<\/table>/g)?.length);
       for (const [, id] of report.matchAll(/\]\(#([^)]*)\)/g))
-        assert.ok(report.includes(`name="${id}"`), `missing target ${id}`);
+        assert.ok(report.includes(`id="${id}"`), `missing target ${id}`);
     }
   });
 }

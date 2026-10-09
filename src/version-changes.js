@@ -157,7 +157,7 @@ function versions(values, history, layout) {
 }
 
 function anchor(name) {
-  return `<a name="user-content-${name}"></a>`;
+  return `<a id="user-content-${name}"></a>`;
 }
 
 function historySection(change, id, tableId, layout) {
