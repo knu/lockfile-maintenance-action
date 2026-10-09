@@ -156,10 +156,14 @@ function versions(values, history, layout) {
     : '—';
 }
 
+function anchor(name) {
+  return `<a name="user-content-${name}"></a>`;
+}
+
 function historySection(change, id, tableId, layout) {
   const { name, from, to, history } = change;
   const links = [
-    layout === 'separate' && `[Back to version changes](#${tableId})`,
+    layout === 'separate' && `[Back to version changes](#user-content-${tableId})`,
     history.compareUrl && `[Compare](${history.compareUrl})`,
     history.changelogUrl && `[CHANGELOG.md](${history.changelogUrl})`,
     `[Releases](${history.releasesUrl})`,
@@ -176,7 +180,7 @@ function historySection(change, id, tableId, layout) {
       '<details>',
       `<summary>${title} (${history.releases.length} ${history.releases.length === 1 ? 'release' : 'releases'})</summary>`,
       '',
-      `<a name="${id}"></a>`,
+      anchor(id),
       '',
       links,
       '',
@@ -218,7 +222,7 @@ export function changeReport(files, age, maxBytes = 60000, layout = 'separate') 
     const tableId = `versions-${fileIndex + 1}`;
     const section = {
       header:
-        `<a name="${tableId}"></a>\n\n### ${code(file)}\n\n` +
+        `${anchor(tableId)}\n\n### ${code(file)}\n\n` +
         (changes.length
           ? layout === 'inline'
             ? '<table>\n<thead><tr><th>Package</th><th>Before</th><th>After</th><th>Change</th></tr></thead>\n<tbody>\n'
@@ -245,7 +249,7 @@ export function changeReport(files, age, maxBytes = 60000, layout = 'separate') 
       const row =
         layout === 'inline'
           ? `<tr>${cells.map((cell) => `<td>${cell}</td>`).join('')}</tr>\n`
-          : `| ${[...cells, history ? `[Release history](#${id})` : '—'].join(' | ')} |\n`;
+          : `| ${[...cells, history ? `[Release history](#user-content-${id})` : '—'].join(' | ')} |\n`;
       if (!reserve(row + (entry ? entry.header + entry.footer + '\n' : ''))) {
         truncated = true;
         break;

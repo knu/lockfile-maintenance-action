@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Marked } from 'marked';
+import sanitizeHtml from 'sanitize-html';
 import { maintainLockfile } from '../src/maintenance.js';
 import { changeReport } from '../src/version-changes.js';
 
@@ -30,12 +31,44 @@ test('separate is the default, links both ways, and targets named anchors inside
   );
   assert.ok(!report.includes('<a id=') && !report.includes('<details open'));
   for (const index of [1, 2]) {
-    assert.match(report, new RegExp(`\\[Release history\\]\\(#history-${index}-1\\)`));
+    assert.match(report, new RegExp(`\\[Release history\\]\\(#user-content-history-${index}-1\\)`));
     assert.match(
       report,
-      new RegExp(`<details>\\s*<summary>[^]*?</summary>\\s*<a name="history-${index}-1"></a>`),
+      new RegExp(
+        `<details>\\s*<summary>[^]*?</summary>\\s*<a name="user-content-history-${index}-1"></a>`,
+      ),
     );
-    assert.match(report, new RegExp(`\\[Back to version changes\\]\\(#versions-${index}\\)`));
+    assert.match(
+      report,
+      new RegExp(`\\[Back to version changes\\]\\(#user-content-versions-${index}\\)`),
+    );
+  }
+});
+
+test('navigation fragments match anchor names locally and after GitHub prefixes them', () => {
+  const localTargets = [];
+  const targets = [];
+  const fragments = [];
+  sanitizeHtml(new Marked({ gfm: true }).parse(changeReport(files(), '3 days')), {
+    transformTags: {
+      a(tagName, attribs) {
+        if (attribs.name) {
+          localTargets.push(attribs.name);
+          targets.push(
+            attribs.name.startsWith('user-content-')
+              ? attribs.name
+              : `user-content-${attribs.name}`,
+          );
+        }
+        if (attribs.href?.startsWith('#')) fragments.push(attribs.href.slice(1));
+        return { tagName, attribs };
+      },
+    },
+  });
+  assert.equal(fragments.length, 4);
+  for (const fragment of fragments) {
+    assert.equal(localTargets.filter((name) => name === fragment).length, 1, fragment);
+    assert.equal(targets.filter((name) => name === fragment).length, 1, fragment);
   }
 });
 
