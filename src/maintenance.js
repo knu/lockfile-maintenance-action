@@ -5,9 +5,16 @@ import { lockfileTargets } from './targets.js';
 import { pullRequestPaths } from './pull-request.js';
 import { rebaseInstructions } from './rebase.js';
 import { changedFiles, restore, snapshot } from './transaction.js';
-import { changeReport, packageVersions, versionChanges } from './version-changes.js';
+import {
+  changeReport,
+  packageVersions,
+  releaseHistoryLayout,
+  versionChanges,
+} from './version-changes.js';
+import { addReleaseHistory } from './release-history.js';
 
 export async function maintainLockfile(env) {
+  const layout = releaseHistoryLayout(env.INPUT_RELEASE_HISTORY_LAYOUT);
   const { workspace, targets } = await lockfileTargets(env);
 
   const lockfiles = targets.map(({ file }) => file);
@@ -42,14 +49,20 @@ export async function maintainLockfile(env) {
           await readFile(path.join(workspace, target.file), 'utf8'),
           target,
         );
-        files.push({ file: target.file, changes: versionChanges(before.get(target.file), after) });
+        files.push({
+          file: target.file,
+          manager: target.manager.name,
+          changes: versionChanges(before.get(target.file), after),
+        });
       }
+      await addReleaseHistory(files, { token: env.INPUT_TOKEN });
       const instructions = prPaths === undefined ? '' : rebaseInstructions(env);
       const report =
         changeReport(
           files,
           env['INPUT_MINIMUM-RELEASE-AGE'] ?? '3 days',
           60000 - Buffer.byteLength(instructions),
+          layout,
         ) + (instructions ? `\n${instructions}` : '');
       await writeFile(env.LOCKFILE_REPORT_PATH, report);
       if (env.GITHUB_STEP_SUMMARY) await appendFile(env.GITHUB_STEP_SUMMARY, report);

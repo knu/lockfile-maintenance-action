@@ -87,6 +87,9 @@ inputs:
       Passed to native resolvers; their source/package exceptions and missing-timestamp
       behavior still apply. Git dependencies are not age-checked.
     default: 3 days
+  release-history-layout:
+    description: Release history layout. Separate collapsible sections (separate), or collapsible rows inside each table (inline).
+    default: separate
   working-directory:
     description: Root for file patterns, relative to the checkout.
     default: .
@@ -207,6 +210,8 @@ runs:
         INPUT_MINIMUM-RELEASE-AGE: ${{ inputs.minimum-release-age }}
         INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}
         INPUT_CREATE_PULL_REQUEST: ${{ inputs.create-pull-request }}
+        INPUT_RELEASE_HISTORY_LAYOUT: ${{ inputs.release-history-layout }}
+        INPUT_TOKEN: ${{ steps.authentication.outputs.token }}
         LOCKFILE_REPORT_PATH: ${{ steps.runtime.outputs.directory }}/pull-request.md
       run: node "$ACTION_DIRECTORY/src/main.js"
 

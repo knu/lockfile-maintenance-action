@@ -209,6 +209,38 @@ test('invalid structured lockfiles fail instead of claiming no changes', async (
     await assert.rejects(packageVersions(manager, 'not a lockfile'));
 });
 
+test('release notes preserve entities, inline HTML, and code without double escaping', () => {
+  const report = changeReport(
+    [
+      {
+        file: 'package-lock.json',
+        changes: [
+          {
+            name: 'magic-string',
+            from: ['1.4.2'],
+            to: ['1.4.3'],
+            history: {
+              releasesUrl: 'https://github.com/Rich-Harris/magic-string/releases',
+              releases: [
+                {
+                  tag: 'v1.4.3',
+                  url: 'https://github.com/Rich-Harris/magic-string/releases/tag/v1.4.3',
+                  body: '### &nbsp;🐞 Bug Fixes\n\n- Fix &nbsp;-&nbsp; by @youdie006 [<samp>(607e8)</samp>](https://example.com/commit)\n\n`a < b && c > d`\n\n```js\nconst value = "<samp>";\n```',
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+    '2 days',
+  );
+  assert.ok(!report.includes('&#38;nbsp;'));
+  assert.match(report, /<samp>\(607e8\)<\/samp>/);
+  assert.match(report, /<code>a &lt; b &amp;&amp; c &gt; d<\/code>/);
+  assert.match(report, /&lt;samp&gt;/);
+});
+
 test('classifies release components, downgrades, and non-SemVer or ambiguous changes', () => {
   for (const [from, to, expected] of [
     [['1.2.3'], ['2.0.0'], 'major'],

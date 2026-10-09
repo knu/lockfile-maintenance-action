@@ -5,6 +5,7 @@ import { parseSyml } from '@yarnpkg/parsers';
 import { parse as parseDependencyPath } from '@pnpm/dependency-path';
 import semver from 'semver';
 import { command } from './command.js';
+import { releaseNotes } from './release-notes.js';
 
 export async function packageVersions(manager, contents, context) {
   let packages;
@@ -135,52 +136,152 @@ function code(value) {
   return `<code>${escaped}</code>`;
 }
 
-export function changeReport(files, age, maxBytes = 60000) {
-  const lines = [
-    `Update selected lockfiles with a minimum release age of ${code(age)}.`,
-    '',
-    "The package managers' native exceptions still apply.  Validate updates with the repository's PR CI.",
-    '',
-    '## Version changes',
-    '',
-    'Versions are grouped by package name.  — means the package was not present.',
-    '',
-  ];
-  let size = Buffer.byteLength(lines.join('\n'));
-  const append = (line) => {
-    if (size + Buffer.byteLength(line) + 1 > maxBytes - 200) return false;
-    lines.push(line);
-    size += Buffer.byteLength(line) + 1;
+export function releaseHistoryLayout(value = 'separate') {
+  if (!['separate', 'inline'].includes(value))
+    throw new Error('release-history-layout must be separate or inline');
+  return value;
+}
+
+function versions(values, history, layout) {
+  return values.length
+    ? values
+        .map((value) => {
+          const url = history?.versionUrls?.[value];
+          if (!url) return code(value);
+          return layout === 'inline'
+            ? `<a href="${url.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}">${code(value)}</a>`
+            : `[${code(value)}](${url})`;
+        })
+        .join(', ')
+    : '—';
+}
+
+function historySection(change, id, tableId, layout) {
+  const { name, from, to, history } = change;
+  const links = [
+    layout === 'separate' && `[Back to version changes](#${tableId})`,
+    history.compareUrl && `[Compare](${history.compareUrl})`,
+    history.changelogUrl && `[CHANGELOG.md](${history.changelogUrl})`,
+    `[Releases](${history.releasesUrl})`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const title =
+    layout === 'separate'
+      ? `${code(name)} — ${from.map(code).join(', ') || '—'} → ${to.map(code).join(', ') || '—'}`
+      : 'Release history';
+  return {
+    header: [
+      layout === 'inline' ? '<tr><td colspan="4">' : '',
+      '<details>',
+      `<summary>${title} (${history.releases.length} ${history.releases.length === 1 ? 'release' : 'releases'})</summary>`,
+      '',
+      `<a name="${id}"></a>`,
+      '',
+      links,
+      '',
+      history.incomplete
+        ? 'Release lookup was incomplete.  See Releases for the full history.\n'
+        : '',
+      history.releases.length ? '' : 'No published release notes found.  See the links above.\n',
+    ].join('\n'),
+    notes: [],
+    footer: `\n</details>\n${layout === 'inline' ? '</td></tr>\n' : ''}`,
+    releases: history.releases,
+  };
+}
+
+export function changeReport(files, age, maxBytes = 60000, layout = 'separate') {
+  releaseHistoryLayout(layout);
+  const intro =
+    [
+      `Update selected lockfiles with a minimum release age of ${code(age)}.`,
+      '',
+      "The package managers' native exceptions still apply.  Validate updates with the repository's PR CI.",
+      '',
+      '## Version changes',
+      '',
+      'Versions are grouped by package name.  — means the package was not present.',
+      '',
+    ].join('\n') + '\n';
+  let size = Buffer.byteLength(intro);
+  const reserve = (text) => {
+    const bytes = Buffer.byteLength(text);
+    if (size + bytes > maxBytes - 200) return false;
+    size += bytes;
     return true;
   };
+  const sections = [];
+  const histories = [];
   let truncated = false;
-  for (const { file, changes } of files) {
-    const section =
-      `### ${code(file)}\n\n` +
-      (changes.length
-        ? '| Package | Before | After | Change |\n| --- | --- | --- | --- |'
-        : 'No package version changes (metadata, source, or dependency graph changes only).');
-    if (!append(section)) {
+  for (const [fileIndex, { file, changes }] of files.entries()) {
+    const tableId = `versions-${fileIndex + 1}`;
+    const section = {
+      header:
+        `<a name="${tableId}"></a>\n\n### ${code(file)}\n\n` +
+        (changes.length
+          ? layout === 'inline'
+            ? '<table>\n<thead><tr><th>Package</th><th>Before</th><th>After</th><th>Change</th></tr></thead>\n<tbody>\n'
+            : '| Package | Before | After | Change | History |\n| --- | --- | --- | --- | --- |\n'
+          : 'No package version changes (metadata, source, or dependency graph changes only).\n'),
+      rows: [],
+      footer: changes.length && layout === 'inline' ? '</tbody>\n</table>\n\n' : '\n',
+    };
+    if (!reserve(section.header + section.footer)) {
       truncated = true;
       break;
     }
-    for (const { name, from, to } of changes) {
-      const versions = (values) => (values.length ? values.map(code).join(', ') : '—');
-      if (
-        !append(`| ${code(name)} | ${versions(from)} | ${versions(to)} | ${changeType(from, to)} |`)
-      ) {
+    sections.push(section);
+    for (const [changeIndex, change] of changes.entries()) {
+      const { name, from, to, history } = change;
+      const id = `history-${fileIndex + 1}-${changeIndex + 1}`;
+      const entry = history ? historySection(change, id, tableId, layout) : undefined;
+      const cells = [
+        code(name),
+        versions(from, history, layout),
+        versions(to, history, layout),
+        changeType(from, to),
+      ];
+      const row =
+        layout === 'inline'
+          ? `<tr>${cells.map((cell) => `<td>${cell}</td>`).join('')}</tr>\n`
+          : `| ${[...cells, history ? `[Release history](#${id})` : '—'].join(' | ')} |\n`;
+      if (!reserve(row + (entry ? entry.header + entry.footer + '\n' : ''))) {
         truncated = true;
         break;
       }
+      section.rows.push({ text: row, history: entry });
+      if (entry) histories.push(entry);
     }
     if (truncated) break;
-    append('');
   }
-  if (!files.length) append('No lockfile changes.');
-  if (truncated)
-    lines.push(
-      '',
-      'Report truncated to fit the PR body limit.  See the file diff for the remaining changes.',
-    );
-  return `${lines.join('\n')}\n`;
+  for (const entry of histories) {
+    for (const release of entry.releases) {
+      const note = `#### [${code(release.tag)}](${release.url})\n\n${releaseNotes(release.body)}\n\n`;
+      if (reserve(note)) entry.notes.push(note);
+      else truncated = true;
+    }
+  }
+  const renderHistory = (entry) => entry.header + entry.notes.join('') + entry.footer;
+  return (
+    intro +
+    sections
+      .map(
+        (section) =>
+          section.header +
+          section.rows
+            .map(
+              (row) =>
+                row.text + (layout === 'inline' && row.history ? renderHistory(row.history) : ''),
+            )
+            .join('') +
+          section.footer,
+      )
+      .join('') +
+    (layout === 'separate' ? histories.map(renderHistory).join('\n') : '') +
+    (!files.length ? 'No lockfile changes.\n' : '') +
+    (truncated
+      ? '\nReport truncated to fit the PR body limit.  See Releases for omitted notes and the file diff for remaining changes.\n'
+      : '')
+  );
 }

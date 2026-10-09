@@ -33,6 +33,10 @@ on:
           dependencies are not age-checked.
         type: string
         default: 3 days
+      release-history-layout:
+        description: Release history layout (separate or inline).
+        type: string
+        default: separate
       working-directory:
         description: Root for file patterns, relative to the checkout.
         type: string
@@ -125,6 +129,7 @@ jobs:
           auth: ${{ inputs.auth }}
           files: ${{ inputs.files }}
           minimum-release-age: ${{ inputs.minimum-release-age }}
+          release-history-layout: ${{ inputs.release-history-layout }}
           working-directory: ${{ inputs.working-directory }}
           branch: ${{ inputs.branch }}
           base: ${{ inputs.base || github.event.repository.default_branch }}

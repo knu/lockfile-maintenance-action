@@ -208,6 +208,12 @@ The Action sets up Node.js 24 for its own runtime and installs its runtime depen
 
   Default: `3 days`
 
+- `release-history-layout` (string, optional)
+
+  `separate` places collapsible release histories after the version-change tables, with links to move between them.  `inline` embeds collapsible histories in table rows.  Version numbers link to upstream releases or tags when available.
+
+  Default: `separate`
+
 - `working-directory` (string, optional)
 
   Root for file selection, relative to the checkout.  It must remain inside the checkout.  Symlinked lockfiles and lockfile directories are rejected.
