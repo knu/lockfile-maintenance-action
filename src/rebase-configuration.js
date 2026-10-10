@@ -120,7 +120,7 @@ export async function rebaseConfiguration(env, request = fetch) {
     return response.json();
   };
   try {
-    const repository = await json('');
+    const repository = await json(root.href.slice(0, -1));
     const ref = repository.default_branch;
     if (typeof ref !== 'string' || !ref) throw new Error('missing default branch');
     const contents = async (file) => {

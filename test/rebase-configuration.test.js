@@ -104,7 +104,10 @@ function api(auth, workflow, failure = 0) {
       assert.equal(options.headers.Authorization, 'Bearer test-token');
       assert.equal(options.redirect, 'error');
       if (calls.length === failure) return new Response(null, { status: 403 });
-      if (calls.length === 1) return Response.json({ default_branch: 'release/next' });
+      if (calls.length === 1)
+        return url.pathname.endsWith('/')
+          ? new Response(null, { status: 404 })
+          : Response.json({ default_branch: 'release/next' });
       const contents = url.pathname.endsWith('lockfile-maintenance-auth.yml') ? auth : workflow;
       return contents === undefined
         ? new Response(null, { status: 404 })
