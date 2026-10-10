@@ -172,8 +172,9 @@ test('exports literal PR paths when PR creation is enabled, including unchanged 
   assert.match(output, /changed=false\n/);
   assert.match(output, /pr-paths<<([^\n]+)\n:\(literal\)Cargo.lock\n\1\n/);
   const body = await readFile(report, 'utf8');
-  assert.match(body, /- \[ \] Rebase this PR/);
-  assert.match(body, /\/lockfile rebase/);
+  assert.match(body, /Rebase configuration could not be verified/);
+  assert.doesNotMatch(body, /- \[ \] Rebase this PR/);
+  assert.match(body, /<summary>Rebase setup<\/summary>/);
   assert.match(body, /https:\/\/github.com\/owner\/repo\/actions\/workflows\/maintenance.yml/);
 });
 

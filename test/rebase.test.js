@@ -9,6 +9,7 @@ import {
   rebaseCheckbox,
   rebaseInstructions,
   rebaseRequest,
+  rebaseSetup,
   workflowFile,
   workflowUrl,
 } from '../src/rebase.js';
@@ -174,7 +175,7 @@ test('custom maintenance branches and workflows come only from trusted inputs', 
   assert.equal(ignored.calls.length, 0);
 });
 
-test('PR instructions include both controls, subscriptions and escaped workflow fallback', () => {
+test('setup links use the calling workflow and escape its filename', () => {
   const special = {
     ...env,
     GITHUB_WORKFLOW_REF:
@@ -188,16 +189,44 @@ test('PR instructions include both controls, subscriptions and escaped workflow 
     workflowUrl(special),
     /^https:\/\/github.example.com\/owner\/project\/actions\/workflows\/maintain%20%28locks%29.yml$/,
   );
-  const instructions = rebaseInstructions(env);
+  const setup = rebaseSetup(special);
   for (const text of [
-    rebaseCheckbox,
-    '/lockfile rebase',
     'issue_comment',
     'pull_request_target',
     'workflow_dispatch',
-    '**Run workflow**',
+    workflowUrl(special),
+    'id="user-content-rebase-setup"',
   ])
-    assert.ok(instructions.includes(text));
+    assert.ok(setup.includes(text));
+});
+
+test('PR guidance selects one configured trigger and preserves checkbox transitions with a link', () => {
+  const configuration = { verified: true, checkbox: true, comment: true };
+  const checkbox = rebaseInstructions(configuration);
+  assert.ok(checkbox.includes(`${rebaseCheckbox}\n  [Rebase setup]`));
+  assert.ok(!checkbox.includes('/lockfile rebase'));
+  assert.equal(
+    rebaseRequest('pull_request_target', {
+      sender: { type: 'User' },
+      action: 'edited',
+      changes: { body: { from: checkbox } },
+      pull_request: { number: 42, body: checkbox.replace('[ ]', '[x]') },
+    }),
+    42,
+  );
+  const comment = rebaseInstructions({ ...configuration, checkbox: false });
+  assert.ok(comment.includes('/lockfile rebase'));
+  assert.ok(!comment.includes(rebaseCheckbox));
+  for (const verified of [true, false]) {
+    const instructions = rebaseInstructions({ verified, checkbox: false, comment: false });
+    assert.match(instructions, /Rebase setup/);
+    assert.ok(!instructions.includes(rebaseCheckbox) && !instructions.includes('/lockfile rebase'));
+  }
+});
+
+test('PR body budget reserves trigger guidance and setup before truncating version changes', () => {
+  const instructions = rebaseInstructions({ verified: true, checkbox: true, comment: true });
+  const setup = rebaseSetup(env);
   const report = changeReport(
     [
       {
@@ -210,10 +239,13 @@ test('PR instructions include both controls, subscriptions and escaped workflow 
       },
     ],
     '3 days',
-    60000 - Buffer.byteLength(instructions),
+    60000,
+    'separate',
+    { afterTables: `\n${instructions}\n`, footer: `\n${setup}` },
   );
-  assert.ok(Buffer.byteLength(`${report}\n${instructions}`) < 60000);
+  assert.ok(Buffer.byteLength(report) <= 60000);
   assert.match(report, /Report truncated/);
+  assert.ok(report.includes(instructions) && report.endsWith(setup));
 });
 
 test('request entrypoint ignores unrelated events without API or checkout', async (t) => {

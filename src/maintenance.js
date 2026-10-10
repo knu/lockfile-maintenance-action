@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { lockfileTargets } from './targets.js';
 import { pullRequestPaths } from './pull-request.js';
-import { rebaseInstructions } from './rebase.js';
+import { rebaseInstructions, rebaseSetup } from './rebase.js';
+import { rebaseConfiguration } from './rebase-configuration.js';
 import { changedFiles, restore, snapshot } from './transaction.js';
 import {
   changeReport,
@@ -56,14 +57,21 @@ export async function maintainLockfile(env) {
         });
       }
       await addReleaseHistory(files, { token: env.INPUT_TOKEN });
-      const instructions = prPaths === undefined ? '' : rebaseInstructions(env);
-      const report =
-        changeReport(
-          files,
-          env['INPUT_MINIMUM-RELEASE-AGE'] ?? '3 days',
-          60000 - Buffer.byteLength(instructions),
-          layout,
-        ) + (instructions ? `\n${instructions}` : '');
+      const rebase =
+        prPaths === undefined
+          ? {}
+          : {
+              [layout === 'inline' ? 'beforeTables' : 'afterTables']:
+                `\n${rebaseInstructions(await rebaseConfiguration(env))}\n`,
+              footer: `\n${rebaseSetup(env)}`,
+            };
+      const report = changeReport(
+        files,
+        env['INPUT_MINIMUM-RELEASE-AGE'] ?? '3 days',
+        60000,
+        layout,
+        rebase,
+      );
       await writeFile(env.LOCKFILE_REPORT_PATH, report);
       if (env.GITHUB_STEP_SUMMARY) await appendFile(env.GITHUB_STEP_SUMMARY, report);
     }

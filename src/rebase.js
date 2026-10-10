@@ -26,21 +26,43 @@ export function workflowUrl(env, file = workflowFile(env)) {
   ).href;
 }
 
-export function rebaseInstructions(env) {
+const setupLink = '[Rebase setup](#user-content-rebase-setup)';
+
+export function rebaseInstructions(configuration) {
+  const checkbox = configuration.checkbox;
+  let control;
+  if (checkbox) control = `${rebaseCheckbox}\n  ${setupLink}`;
+  else if (configuration.comment)
+    control = `Post a new PR comment with \`${rebaseCommand}\` on its own line to regenerate the lockfiles from the latest base branch.  ${setupLink}`;
+  else
+    control = `${configuration.verified ? 'Rebase requests are not configured for this report.' : 'Rebase configuration could not be verified.'}  ${setupLink}`;
   return [
     '## Rebase',
     '',
-    rebaseCheckbox,
+    control,
     '',
-    `Check the box above or post a new PR comment with \`${rebaseCommand}\` on its own line.  Requires repository write access.`,
-    '',
+    ...(checkbox || configuration.comment ? ['Requires repository write access.', ''] : []),
+  ].join('\n');
+}
+
+export function rebaseSetup(env) {
+  return [
     '<details>',
-    '<summary>Workflow requirements and manual fallback</summary>',
+    '<summary>Rebase setup</summary>',
     '',
-    'Enable App-based rebase handling with `rebase: true` in `.github/lockfile-maintenance-auth.yml`, or configure an Actions request handler as described below.',
+    '<a id="user-content-rebase-setup"></a>',
     '',
-    'For Actions-based handling, the workflow must subscribe to `pull_request_target: types: [edited]` for the checkbox and `issue_comment: types: [created]` for comments, and configure the request-rebase job.',
-    `If these handlers are not configured, [open the maintenance workflow](<${workflowUrl(env)}>) and select **Run workflow** on the branch used for maintenance.  This requires \`workflow_dispatch\`.`,
+    'For PRs created by the Lockfile Maintenance App, add this to `.github/lockfile-maintenance-auth.yml` on the default branch:',
+    '',
+    '```yaml',
+    'rebase: true',
+    '```',
+    '',
+    `Keep \`workflow_dispatch\` in [the maintenance workflow](<${workflowUrl(env)}>).  Existing App installations must approve the Actions and Issues write permissions.`,
+    '',
+    'Alternatively, configure an Actions request-rebase job with `pull_request_target: types: [edited]` for checkboxes or `issue_comment: types: [created]` for comments.  Keep `workflow_dispatch` for the maintenance run.',
+    '',
+    '[Configuration and custom branches](https://github.com/knu/lockfile-maintenance-action#requesting-a-rebase)',
     '',
     '</details>',
     '',

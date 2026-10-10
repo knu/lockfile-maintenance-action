@@ -211,8 +211,11 @@ runs:
         INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}
         INPUT_CREATE_PULL_REQUEST: ${{ inputs.create-pull-request }}
         INPUT_RELEASE_HISTORY_LAYOUT: ${{ inputs.release-history-layout }}
+        INPUT_AUTH: ${{ inputs.auth }}
         INPUT_TOKEN: ${{ steps.authentication.outputs.token }}
         LOCKFILE_REPORT_PATH: ${{ steps.runtime.outputs.directory }}/pull-request.md
+        INPUT_BRANCH: ${{ inputs.branch }}
+        INPUT_BASE: ${{ inputs.base }}
       run: node "$ACTION_DIRECTORY/src/main.js"
 
     - name: Create or update pull request

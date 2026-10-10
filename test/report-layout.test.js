@@ -4,6 +4,7 @@ import { Marked } from 'marked';
 import sanitizeHtml from 'sanitize-html';
 import { maintainLockfile } from '../src/maintenance.js';
 import { changeReport } from '../src/version-changes.js';
+import { rebaseInstructions, rebaseSetup } from '../src/rebase.js';
 
 function files(body = 'Release notes') {
   const history = {
@@ -19,6 +20,61 @@ function files(body = 'Release notes') {
     file,
     changes: [{ name: 'example', from: ['1.0.0'], to: ['1.1.0'], history }],
   }));
+}
+
+for (const layout of ['separate', 'inline']) {
+  test(`${layout} places rebase before every HTML release list and resolves its setup link`, () => {
+    const configuration = { verified: true, checkbox: true, comment: true };
+    const report = changeReport(
+      files('<ul><li>Change</li></ul>\n<ol><li>Fix</li></ol>'),
+      '3 days',
+      60000,
+      layout,
+      {
+        [layout === 'inline' ? 'beforeTables' : 'afterTables']:
+          `\n${rebaseInstructions(configuration)}\n`,
+        footer: `\n${rebaseSetup({
+          GITHUB_REPOSITORY: 'owner/project',
+          GITHUB_WORKFLOW_REF:
+            'owner/project/.github/workflows/lockfile-maintenance.yml@refs/heads/main',
+        })}`,
+      },
+    );
+    if (layout === 'inline') {
+      assert.ok(report.indexOf('native exceptions') < report.indexOf('## Rebase'));
+      assert.ok(report.indexOf('## Rebase') < report.indexOf('## Version changes'));
+    } else assert.ok(report.indexOf('second/package') < report.indexOf('## Rebase'));
+    assert.ok(report.indexOf('## Rebase') < report.indexOf('<details>'));
+    const lists = [];
+    const targets = [];
+    const fragments = [];
+    sanitizeHtml(new Marked({ gfm: true }).parse(report), {
+      transformTags: {
+        ul(tagName, attribs) {
+          lists.push(tagName);
+          return { tagName, attribs };
+        },
+        ol(tagName, attribs) {
+          lists.push(tagName);
+          return { tagName, attribs };
+        },
+        input(tagName, attribs) {
+          assert.equal(lists.length, 1);
+          return { tagName, attribs };
+        },
+        a(tagName, attribs) {
+          if (attribs.id) targets.push(attribs.id);
+          if (attribs.href?.startsWith('#')) fragments.push(attribs.href.slice(1));
+          return { tagName, attribs };
+        },
+      },
+    });
+    assert.equal(lists.length, 5);
+    assert.ok(fragments.includes('user-content-rebase-setup'));
+    for (const fragment of fragments)
+      assert.equal(targets.filter((id) => id === fragment).length, 1);
+    assert.ok(report.trimEnd().endsWith('</details>'));
+  });
 }
 
 test('separate is the default, links both ways, and targets IDs inside closed details', () => {

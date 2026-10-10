@@ -261,7 +261,11 @@ A PR creation failure fails the Action; the file-update rollback applies to depe
 
 ### Requesting a rebase
 
-Each maintenance PR includes a rebase checkbox, instructions to comment `/lockfile rebase`, and a link to the workflow's Actions page.  Rebase requests regenerate the selected lockfiles from the latest base and update the same PR.  Dependency versions may change during resolution.  The reserved maintenance branch must not contain manual changes you need to preserve.
+When creating or updating a maintenance PR, the Action reads the App policy and the calling workflow on the repository's default branch.  It shows one rebase method: a checkbox when configured, otherwise a new `/lockfile rebase` comment when configured.  With separate release histories, the guidance appears directly below the version tables.  With inline release histories, it appears after the opening explanation, before the tables, so HTML lists inside the tables do not interfere with GitHub's checkbox positions.  If neither method is configured or configuration cannot be read, the PR links to setup instead.  Setup instructions are collapsed at the end of the PR body and linked from the checkbox item or comment guidance.
+
+The check recognizes App handling for OIDC authentication with `lockfile-maintenance.yml`, matching branches, an authorized dispatch ref, and `workflow_dispatch`.  For Actions handling, it looks for a `request-rebase` Action step and the corresponding event subscriptions in the calling workflow.  This checks configuration, not App installation permissions or arbitrary job and step conditions.
+
+Rebase requests regenerate the selected lockfiles from the latest base and update the same PR.  Dependency versions may change during resolution.  The reserved maintenance branch must not contain manual changes you need to preserve.
 
 #### App-based rebase handling
 
@@ -362,7 +366,7 @@ A new comment with `/lockfile rebase` on its own line, or an unchecked-to-checke
 
 Accepted command comments receive 👍 before dispatch.  After maintenance succeeds for the requested PR, the Action adds 🎉; dispatch or maintenance failures add 😕 (`confused`, one of GitHub's supported reactions).  After adding the result, the handler removes its own acceptance reaction; reactions from other users remain.  Result reactions use `reaction-token`, not the OIDC installation token, and verify that the comment belongs to the requested PR.  A failure before the maintenance Action starts, runner termination, or unavailable GitHub API can prevent notification; follow the workflow link if only 👍 remains.  Queueing and tool setup mean acceptance and completion need not be immediate.
 
-The checkbox resets when maintenance successfully updates the PR body.  After a failure, uncheck and check it again, post a new command comment, or use the workflow link.  Without the event subscriptions and request job, the PR controls have no effect: follow the link and select **Run workflow**, choosing the branch used for maintenance.  Manual execution requires `workflow_dispatch` and repository write access.  The PR always includes this fallback; the Action does not inspect the workflow to determine which controls are enabled.
+The checkbox resets when maintenance successfully updates the PR body.  After a failure, uncheck and check it again, or post a new command comment if comment requests are configured.  You can also select **Run workflow** on the maintenance workflow's Actions page, choosing the branch used for maintenance.  Manual execution requires `workflow_dispatch` and repository write access.
 
 ## OIDC authentication
 

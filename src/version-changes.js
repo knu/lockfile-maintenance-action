@@ -195,7 +195,13 @@ function historySection(change, id, tableId, layout) {
   };
 }
 
-export function changeReport(files, age, maxBytes = 60000, layout = 'separate') {
+export function changeReport(
+  files,
+  age,
+  maxBytes = 60000,
+  layout = 'separate',
+  { beforeTables = '', afterTables = '', footer = '' } = {},
+) {
   releaseHistoryLayout(layout);
   const intro =
     [
@@ -203,12 +209,10 @@ export function changeReport(files, age, maxBytes = 60000, layout = 'separate') 
       '',
       "The package managers' native exceptions still apply.  Validate updates with the repository's PR CI.",
       '',
-      '## Version changes',
-      '',
-      'Versions are grouped by package name.  — means the package was not present.',
-      '',
     ].join('\n') + '\n';
-  let size = Buffer.byteLength(intro);
+  const heading =
+    '## Version changes\n\nVersions are grouped by package name.  — means the package was not present.\n\n';
+  let size = Buffer.byteLength(intro + heading + beforeTables + afterTables + footer);
   const reserve = (text) => {
     const bytes = Buffer.byteLength(text);
     if (size + bytes > maxBytes - 200) return false;
@@ -269,6 +273,8 @@ export function changeReport(files, age, maxBytes = 60000, layout = 'separate') 
   const renderHistory = (entry) => entry.header + entry.notes.join('') + entry.footer;
   return (
     intro +
+    beforeTables +
+    heading +
     sections
       .map(
         (section) =>
@@ -282,10 +288,12 @@ export function changeReport(files, age, maxBytes = 60000, layout = 'separate') 
           section.footer,
       )
       .join('') +
+    afterTables +
     (layout === 'separate' ? histories.map(renderHistory).join('\n') : '') +
     (!files.length ? 'No lockfile changes.\n' : '') +
     (truncated
       ? '\nReport truncated to fit the PR body limit.  See Releases for omitted notes and the file diff for remaining changes.\n'
-      : '')
+      : '') +
+    footer
   );
 }
