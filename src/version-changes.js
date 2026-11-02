@@ -6,10 +6,14 @@ import { parse as parseDependencyPath } from '@pnpm/dependency-path';
 import semver from 'semver';
 import { command } from './command.js';
 import { releaseNotes } from './release-notes.js';
+import { actionDependencies } from './actions-lockfile.js';
 
 export async function packageVersions(manager, contents, context) {
   let packages;
   switch (manager) {
+    case 'github-actions':
+      packages = actionDependencies(contents).map(({ name, commit }) => [name, commit]);
+      break;
     case 'npm': {
       const data = JSON.parse(contents);
       if (![1, 2, 3].includes(data.lockfileVersion))
@@ -113,6 +117,7 @@ export function changeType(from, to) {
   if (!removed.length) return 'added version';
   if (!added.length) return 'removed version';
   if (removed.length !== 1 || added.length !== 1) return 'multiple';
+  if ([removed[0], added[0]].every((value) => /^sha1-[0-9a-f]{40}$/i.test(value))) return 'commit';
   const parse = (value) =>
     semver.parse(
       /^\d+(?:\.\d+)?$/.test(value) ? value + '.0'.repeat(3 - value.split('.').length) : value,
@@ -207,7 +212,7 @@ export function changeReport(
     [
       `Update selected lockfiles with a minimum release age of ${code(age)}.`,
       '',
-      "The package managers' native exceptions still apply.  Validate updates with the repository's PR CI.",
+      "Package managers retain their native exceptions.  Actions pins use dated releases within existing refs, retaining pins without eligible candidates.  Validate updates with the repository's PR CI.",
       '',
     ].join('\n') + '\n';
   const heading =

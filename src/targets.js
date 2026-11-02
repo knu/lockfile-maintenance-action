@@ -31,15 +31,20 @@ export async function lockfileTargets(env) {
     const manager = managers.get(path.basename(file));
     if (!manager || !selected(file)) continue;
     const lockfile = path.join(root, file);
-    const directory = path.dirname(lockfile);
-    if ((await realpath(directory)) !== directory)
+    const lockDirectory = path.dirname(lockfile);
+    if ((await realpath(lockDirectory)) !== lockDirectory)
       throw new Error(`lockfile directory must not contain symlinks: ${file}`);
-    const manifest = path.join(directory, manager.manifest);
+    const actions = manager.name === 'github-actions';
+    if (actions && lockfile !== path.join(workspace, '.github/workflows/actions.lock')) continue;
+    const directory = actions ? workspace : lockDirectory;
     await requireFile(lockfile);
-    await requireFile(manifest);
-    if (manifests.has(manifest))
-      throw new Error(`multiple package managers selected for ${manifest}`);
-    manifests.add(manifest);
+    if (manager.manifest) {
+      const manifest = path.join(directory, manager.manifest);
+      await requireFile(manifest);
+      if (manifests.has(manifest))
+        throw new Error(`multiple package managers selected for ${manifest}`);
+      manifests.add(manifest);
+    }
     targets.push({
       manager,
       directory,

@@ -4,6 +4,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { listFiles } from './files.js';
 
 const protectedNames = new Set([
+  'actions.lock',
   'Cargo.lock',
   'Cargo.toml',
   'pnpm-lock.yaml',
@@ -23,8 +24,11 @@ const protectedNames = new Set([
 ]);
 
 async function protectedFiles(workspace) {
-  return (await listFiles(workspace, process.env, true)).filter((file) =>
-    protectedNames.has(path.basename(file)),
+  return (await listFiles(workspace, process.env, true)).filter(
+    (file) =>
+      protectedNames.has(path.basename(file)) ||
+      /^\.github\/workflows\/[^/]+\.ya?ml$/.test(file) ||
+      /^action\.ya?ml$/.test(path.basename(file)),
   );
 }
 

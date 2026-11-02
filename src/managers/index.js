@@ -4,8 +4,13 @@ import { prepareCargo, updateCargo } from './cargo.js';
 import { prepareNpm, updateNpm } from './npm.js';
 import { preparePnpm, updatePnpm } from './pnpm.js';
 import { prepareNodeManager } from './node-setup.js';
+import { prepareGitHubActions, updateGitHubActions } from './github-actions.js';
 
 export const managers = new Map([
+  [
+    'actions.lock',
+    { name: 'github-actions', prepare: prepareGitHubActions, update: updateGitHubActions },
+  ],
   [
     'package-lock.json',
     {
