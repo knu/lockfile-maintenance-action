@@ -25,12 +25,14 @@ on:
           yarn.lock
           uv.lock
           Gemfile.lock
+          actions.lock
       minimum-release-age:
         description:
           Positive integer and plural unit (seconds, minutes, hours, days, weeks, months). Months
           mean 30 days. Rounded up to minutes for pnpm/Yarn and days for Bundler. Passed to native
           resolvers; their source/package exceptions and missing-timestamp behavior still apply. Git
-          dependencies are not age-checked.
+          dependencies in package managers are not age-checked. Actions lockfiles select dated
+          releases separately; see the documented coverage.
         type: string
         default: 3 days
       release-history-layout:
@@ -57,6 +59,10 @@ on:
         description:
           Automatically prepare pnpm for selected lockfiles. Set to false to use a manually
           installed pnpm.
+        type: boolean
+        default: true
+      setup-actions-lock:
+        description: Prepare the tested gh-actions-lock v0.4.0 extension for selected actions.lock files.
         type: boolean
         default: true
       setup-yarn:
@@ -135,6 +141,7 @@ jobs:
           base: ${{ inputs.base || github.event.repository.default_branch }}
           labels: ${{ inputs.labels }}
           setup-pnpm: ${{ inputs.setup-pnpm }}
+          setup-actions-lock: ${{ inputs.setup-actions-lock }}
           setup-yarn: ${{ inputs.setup-yarn }}
           setup-uv: ${{ inputs.setup-uv }}
           uv-version: ${{ inputs.uv-version }}

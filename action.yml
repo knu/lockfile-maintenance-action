@@ -1,11 +1,14 @@
 name: Lockfile maintenance
-description: Update selected lockfiles with native minimum release ages and create a pull request.
+description: Update selected package and GitHub Actions lockfiles with minimum release ages and create a pull request.
 author: Akinori MUSHA
 branding:
   icon: refresh-cw
   color: green
 
 inputs:
+  setup-actions-lock:
+    description: Prepare the tested gh-actions-lock v0.4.0 extension when actions.lock is selected. Requires gh on PATH. Set to false to preserve a manual installation.
+    default: 'true'
   setup-yarn:
     description: Automatically prepare Yarn for selected lockfiles. Set to false to use a manually installed Yarn.
     default: 'true'
@@ -80,12 +83,14 @@ inputs:
       yarn.lock
       uv.lock
       Gemfile.lock
+      actions.lock
   minimum-release-age:
     description: >-
       Positive integer and plural unit (seconds, minutes, hours, days, weeks, months).
       Months mean 30 days. Rounded up to minutes for pnpm/Yarn and days for Bundler.
       Passed to native resolvers; their source/package exceptions and missing-timestamp
-      behavior still apply. Git dependencies are not age-checked.
+      behavior still apply. Package-manager Git dependencies are not age-checked.
+      Actions lockfiles select dated releases separately; see the documented coverage.
     default: 3 days
   release-history-layout:
     description: Release history layout. Separate collapsible sections (separate), or collapsible rows inside each table (inline).
@@ -206,6 +211,7 @@ runs:
         ACTION_DIRECTORY: ${{ steps.runtime.outputs.directory }}
         INPUT_SETUP_YARN: ${{ inputs.setup-yarn }}
         INPUT_SETUP_PNPM: ${{ inputs.setup-pnpm }}
+        INPUT_SETUP_ACTIONS_LOCK: ${{ inputs.setup-actions-lock }}
         INPUT_FILES: ${{ inputs.files }}
         INPUT_MINIMUM-RELEASE-AGE: ${{ inputs.minimum-release-age }}
         INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}

@@ -1,6 +1,6 @@
 # Lockfile Maintenance Action for GitHub Actions
 
-This Action updates Git-tracked lockfiles using Cargo, npm, pnpm, Yarn, uv, or Bundler, with a minimum release age passed to each tool's dependency resolver.  It selects the tool from the lockfile name and updates dependencies within the existing manifest constraints.
+This Action updates Git-tracked package and GitHub Actions lockfiles within their existing dependency constraints.  Cargo, npm, pnpm, Yarn, uv, and Bundler receive a minimum release age through their native resolvers.  GitHub Actions lockfiles use dated release candidates and the official lockfile verifier.
 
 By default, all supported lockfiles in the repository, including subdirectories, are selected.  Use gitignore-style patterns to limit the selection.  Untracked files are never selected.
 
@@ -12,7 +12,7 @@ Renovate's `minimumReleaseAge` controls proposed dependency updates, but lockfil
 
 - **Cargo cooldown support:** as of September 2026, [Renovate's Cargo maintenance command](https://github.com/renovatebot/renovate/blob/main/lib/modules/manager/cargo/artifacts.ts) does not pass its minimum release age to Cargo.  This Action supplies Cargo's native publish-age setting using a pinned nightly toolchain.
 - **Maintenance independent of Renovate's status checks:** we have [observed a maintenance PR](https://github.com/knu/vscode-easy-kill/pull/28) remain pending on `renovate/stability-days` even though every locked version met the configured age at the PR's last update.  The cause was not established.  This Action applies the age policy during resolution and creates its own PR, without waiting for that Renovate status.  Do not require `renovate/stability-days` globally in branch protection; keep normal review and PR CI requirements.
-- **One workflow for six tools:** select Git-tracked Cargo, npm, pnpm, Yarn, uv, and Bundler lockfiles with path patterns.  Review per-file version changes, including transitive dependencies, in the PR body.
+- **One workflow for package and action dependencies:** select Git-tracked package lockfiles and `actions.lock` with path patterns.  Review per-file version or commit changes, including transitive dependencies, in the PR body.
 - **No repository secrets with the App:** install the [Lockfile Maintenance App](https://github.com/apps/lockfile-maintenance) and use OIDC.  App-authored PRs trigger the repository's CI and can join its existing dependency merge queue.
 
 Renovate already forwards age limits to npm and Poetry; it is not missing this integration for every manager.  This Action also supports npm and fails rather than retrying without its cutoff.  Keep Renovate for manifest updates and security alerts, and disable its lockfile maintenance only for the lockfiles delegated here.  Native package/source exceptions still apply; see [release-age behavior](#release-age-behavior).
@@ -97,10 +97,50 @@ Version 2 defaults to OIDC.  Install the Lockfile Maintenance App and grant `id-
 | Yarn | `yarn.lock` | `package.json` | Prepared automatically; requires Yarn >=4.10 |
 | uv | `uv.lock` | `pyproject.toml` | Automatically installs uv 0.12.17; requires >=0.9.17 |
 | Bundler | `Gemfile.lock` | `Gemfile` | Automatically installs Ruby 4.0 and Bundler 4.0.21; requires Bundler >=4.0.18 |
+| GitHub Actions | `.github/workflows/actions.lock` | Onboarded workflows | Requires `gh` on PATH; prepares `github/gh-actions-lock` v0.4.0 |
 
 Yarn support uses the modern Yarn `npmMinimalAgeGate` setting and is tested with Yarn 4.  Yarn Classic (1.x) and Yarn versions below 4.10 are not supported.
 
-Each manifest must be in the same directory as its lockfile.  Select workspace-root lockfiles for package-manager workspaces.  Selecting multiple npm, pnpm, or Yarn lockfiles for the same manifest is an error.  npm shrinkwrap and Poetry lockfiles are not supported.  A sibling `npm-shrinkwrap.json` prevents npm maintenance because it takes precedence over `package-lock.json`.
+Each package manifest must be in the same directory as its lockfile.  Select workspace-root lockfiles for package-manager workspaces.  Selecting multiple npm, pnpm, or Yarn lockfiles for the same manifest is an error.  npm shrinkwrap and Poetry lockfiles are not supported.  A sibling `npm-shrinkwrap.json` prevents npm maintenance because it takes precedence over `package-lock.json`.
+
+### GitHub Actions lockfile maintenance
+
+Onboard workflows with the official `gh actions-lock` extension before selecting
+`/.github/workflows/actions.lock`.  Only this canonical path in the checkout is
+supported, on github.com, using lockfile schema `v0.0.3`.  Workflow YAML is not
+rewritten, and new workflows are not onboarded during maintenance.
+
+- Partial refs such as `@v1` and `@v1.2` select the highest stable release in that
+  version family whose GitHub Release `published_at` meets `minimum-release-age`.
+  If today's release is too young, an older eligible release can still be used.
+  Candidate commits must descend from the current pin and remain reachable
+  from the referenced tag.  Updates never downgrade a current pin.
+- Exact tags, full SHAs, branches, and non-version refs keep their current pins.
+  Branch commit timestamps are not treated as release publication dates.  Use
+  Renovate or Dependabot to change workflow version constraints.
+- Newly introduced transitive dependencies must also have eligible dated
+  releases.  Existing pins can be retained without rechecking their age.
+  A parent whose dependency graph cannot meet the policy tries its next older
+  candidate, then retains its current pin.  Independent dependencies continue
+  updating.  Drafts, prereleases, and unknown dates are not eligible.
+- Candidate composites containing workspace-local or self-repository action
+  references are retained at their current version; this resolver does not
+  infer their changed graphs.  Reusable workflow calls and container images
+  remain outside lockfile coverage.
+
+The official extension's cooldown only emits findings; it does not exclude
+young candidates.  This Action selects candidates from GitHub metadata,
+generates their dependency graph, and runs `gh actions-lock --verify` before
+and after updating.  API errors, changed repository identities, and verification
+failures fail the run and restore original files.  Publication dates are
+upstream metadata, not proof that a dependency is safe.  Review the PR diff and
+run consuming workflows in PR CI.
+
+The same token used by this Action must read every referenced action repository.
+`gh` must already be installed.  `setup-actions-lock` defaults to `true` and
+installs or replaces the extension with tested version v0.4.0 when needed;
+set it to `false` for a manually provisioned v0.4.0.  On self-hosted runners this
+setup persists in the runner user's gh extension directory.
 
 The Action sets up Node.js 24 for its own runtime and installs its runtime dependencies in a temporary directory, reusing an npm download cache.  Cargo uses the pinned nightly without changing the default Rust toolchain.
 
@@ -178,6 +218,12 @@ The Action sets up Node.js 24 for its own runtime and installs its runtime depen
     vendor/example/Cargo.lock
   ```
 
+- `setup-actions-lock` (boolean, optional)
+
+  Prepare the tested verifier when `actions.lock` is selected.  Default: `true`.
+  See [Actions maintenance](#github-actions-lockfile-maintenance) for the required
+  gh version setup and the effect on self-hosted runners.
+
 - `setup-pnpm` (boolean, optional)
 
   Prepare pnpm for each selected lockfile in an isolated temporary directory.  The adjacent `package.json` can select an exact pnpm version >=11 using `packageManager` or `devEngines.packageManager`.  Without a declaration, use a compatible pnpm on PATH, or install the tested fallback, pnpm 12.4.2.  Different lockfile directories can use different versions.
@@ -204,7 +250,7 @@ The Action sets up Node.js 24 for its own runtime and installs its runtime depen
 
 - `minimum-release-age` (string, optional)
 
-  Minimum age passed to each native resolver.  Use a positive integer followed by `seconds`, `minutes`, `hours`, `days`, `weeks`, or `months`, for example `3 days`.  A month means 30 days.  Values are rounded up to whole minutes for pnpm and Yarn, and whole days for Bundler.
+  Minimum age passed to each native package resolver and used to select dated Actions releases.  Use a positive integer followed by `seconds`, `minutes`, `hours`, `days`, `weeks`, or `months`, for example `3 days`.  A month means 30 days.  Values are rounded up to whole minutes for pnpm and Yarn, and whole days for Bundler.
 
   Default: `3 days`
 
@@ -436,7 +482,7 @@ This configuration only authorizes authentication.  It does not start or schedul
 
 ## Release-age behavior
 
-The age setting uses each tool's native policy, including its package and source exceptions.  It is not a universal timestamp check: Git dependencies and Cargo/Bundler registry entries without publish timestamps are not covered.  Named Cargo registries and uv package/index settings can override the general age policy.  Bundler may retain already locked young gems, while Cargo may downgrade them.
+Package lockfiles use each tool's native policy, including its package and source exceptions.  It is not a universal timestamp check: package-manager Git dependencies and Cargo/Bundler registry entries without publish timestamps are not covered.  Named Cargo registries and uv package/index settings can override the general age policy.  Bundler may retain already locked young gems, while Cargo may downgrade them.  Actions lockfiles use the separate [dated-release policy](#github-actions-lockfile-maintenance) above.
 
 npm regenerates `package-lock.json` with `npm update --package-lock-only --ignore-scripts --before=<cutoff>`, where the cutoff is the current time minus `minimum-release-age`.  Using `update` also refreshes dependencies when `node_modules` already exists.  It does not retry without the cutoff when resolution fails.  npm's native source and package exceptions, including `min-release-age-exclude`, still apply.  The CLI cutoff overrides `.npmrc` age settings; set the Action input to the policy you want enforced.  Version reports read lockfile formats 1, 2, and 3; regeneration uses npm's configured output format.
 
