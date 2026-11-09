@@ -41,7 +41,7 @@ The reusable workflow supplies Harden-Runner, automatic tool setup, and update s
 
 For checkbox and comment requests, enable [App-based rebase handling](#app-based-rebase-handling).  The App dispatches this workflow only for valid requests and tracks completion outside Actions.  The caller needs only `schedule` and `workflow_dispatch`; unrelated PR activity creates no maintenance workflow runs.
 
-Both the composite Action and the reusable workflow default to OIDC authentication.  For token authentication, use `auth: token` and pass a write token as `secrets.token`; its GITHUB_TOKEN intentionally has only read access to contents.  Tool selection, minimum release age, branch/base, labels, working directory, and setup options are available as workflow inputs.  The outputs are `pull-request-url` and `changed`.  GitHub.com is required for the self-repository syntax and dispatch run tracking.
+Both the composite Action and the reusable workflow default to OIDC authentication.  For token authentication, use `auth: token` and pass a write token as `secrets.token`; its GITHUB_TOKEN intentionally has only read access to contents.  Tool selection, minimum release age, branch/base, title, labels, working directory, and setup options are available as workflow inputs.  The outputs are `pull-request-url` and `changed`.  GitHub.com is required for the self-repository syntax and dispatch run tracking.
 
 ### Using the composite action directly
 
@@ -191,6 +191,12 @@ The Action sets up Node.js 24 for its own runtime and installs its runtime depen
   Target branch for the PR and automatic checkout.  An existing checkout keeps its current ref; check out the desired base yourself when supplying an existing checkout.
 
   Default: the repository's default branch
+
+- `title` (string, optional)
+
+  Title of the maintenance PR.  Repeated runs reset the title to this value.  Give each branch a distinct title when several maintenance PRs are open at once.
+
+  Default: `Lockfile maintenance`
 
 - `labels` (string, optional)
 
@@ -472,6 +478,7 @@ On that branch, configure the Action to update the same base and use a separate 
   with:
     base: v1
     branch: automation/lockfile-maintenance-v1
+    title: Lockfile maintenance (v1)
 ```
 
 The broker checks the OIDC workflow ref, not the checkout ref or the `base` input.  The `base` input still defaults to the repository's default branch.  An existing checkout is preserved, so it must also point to the intended base.  Serialize runs that share a maintenance PR branch.

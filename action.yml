@@ -63,6 +63,9 @@ inputs:
   base:
     description: Target branch for the PR and automatic checkout. An existing checkout is preserved.
     default: ${{ github.event.repository.default_branch }}
+  title:
+    description: Title for the maintenance PR. Use a distinct title for each branch to tell the PRs apart.
+    default: Lockfile maintenance
   labels:
     description: Comma or newline-separated labels for the PR.
     default: dependencies
@@ -237,7 +240,7 @@ runs:
         labels: ${{ inputs.labels }}
         add-paths: ${{ steps.maintenance.outputs.pr-paths }}
         commit-message: Maintain lockfiles with a minimum release age
-        title: Lockfile maintenance
+        title: ${{ inputs.title }}
         body-path: ${{ steps.runtime.outputs.directory }}/pull-request.md
         delete-branch: true
 
