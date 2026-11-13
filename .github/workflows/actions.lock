@@ -7,8 +7,7 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'step-security/harden-runner@v2.22.3'
     '.github/workflows/ci.yml':
-        - 'actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f'
-        - 'actions-rust-lang/setup-rust-toolchain@v2.0.0'
+        - 'actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30'
         - 'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
@@ -25,8 +24,7 @@ workflows:
         - 'knu/lockfile-maintenance-action@v2'
         - 'step-security/harden-runner@v2.22.3'
     '.github/workflows/maintenance.yml':
-        - 'actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f'
-        - 'actions-rust-lang/setup-rust-toolchain@v2.0.0'
+        - 'actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30'
         - 'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
@@ -39,14 +37,14 @@ workflows:
         - 'ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94'
         - 'step-security/harden-runner@v2.22.3'
 dependencies:
-    'actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f':
-        ref: 'v2.0.0'
-        commit: 'sha1-ecabd13d1c56bd1345c230e542e9144811ad706f'
+    'actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30':
+        ref: 'v2.0.1'
+        commit: 'sha1-a188e68d0fd2bd36ad51dccb2b07ba6e75105f30'
         owner_id: 103899579
         repo_id: 482610590
         uses:
-            - 'swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6'
-    'actions-rust-lang/setup-rust-toolchain@v2.0.0':
+            - 'swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0'
+    'actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f':
         ref: 'v2.0.0'
         commit: 'sha1-ecabd13d1c56bd1345c230e542e9144811ad706f'
         owner_id: 103899579
@@ -139,5 +137,10 @@ dependencies:
     'swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6':
         ref: 'v2.9.2'
         commit: 'sha1-6323deb102c322ba6fcbdcafc7e3dddab59af2b6'
+        owner_id: 580492
+        repo_id: 298565987
+    'swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0':
+        ref: 'v2.9.3'
+        commit: 'sha1-d1527c8f67ef9af357290475d4af4b0fab8f12e0'
         owner_id: 580492
         repo_id: 298565987
