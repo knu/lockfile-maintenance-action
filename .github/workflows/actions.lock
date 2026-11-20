@@ -5,37 +5,31 @@ version: 'v0.0.3'
 workflows:
     '.github/workflows/actions-lock.yml':
         - 'actions/checkout@v7.0.1'
-        - 'step-security/harden-runner@v2.22.3'
+        - 'step-security/harden-runner@v2.22.4'
     '.github/workflows/ci.yml':
         - 'actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30'
         - 'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
-        - 'actions/cache@v6.1.0'
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1'
         - 'actions/setup-node@v7.1.0'
         - 'astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2'
-        - 'peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1'
-        - 'peter-evans/create-pull-request@v8.1.1'
-        - 'ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94'
-        - 'ruby/setup-ruby@v1.336.0'
-        - 'step-security/harden-runner@v2.22.3'
+        - 'peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1'
+        - 'ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199'
+        - 'ruby/setup-ruby@v1.338.0'
+        - 'step-security/harden-runner@v2.22.4'
     '.github/workflows/lockfile-maintenance.yml':
         - 'knu/lockfile-maintenance-action@v2'
-        - 'step-security/harden-runner@v2.22.3'
+        - 'step-security/harden-runner@v2.22.4'
     '.github/workflows/maintenance.yml':
         - 'actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30'
         - 'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
-        - 'actions/cache@v6.1.0'
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
-        - 'actions/checkout@v7.0.1'
         - 'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1'
-        - 'actions/setup-node@v7.1.0'
         - 'astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2'
-        - 'peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1'
-        - 'peter-evans/create-pull-request@v8.1.1'
-        - 'ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94'
-        - 'step-security/harden-runner@v2.22.3'
+        - 'peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1'
+        - 'ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199'
+        - 'step-security/harden-runner@v2.22.4'
 dependencies:
     'actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30':
         ref: 'v2.0.1'
@@ -52,11 +46,6 @@ dependencies:
         uses:
             - 'swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6'
     'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9':
-        ref: 'v6.1.0'
-        commit: 'sha1-55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
-        owner_id: 44036562
-        repo_id: 215566462
-    'actions/cache@v6.1.0':
         ref: 'v6.1.0'
         commit: 'sha1-55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
         owner_id: 44036562
@@ -104,12 +93,12 @@ dependencies:
             - 'astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e'
             - 'peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1'
             - 'ruby/setup-ruby@26e5b7d197ebf60545ee9667bcbace0be11ccaec'
-    'peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1':
-        ref: 'v8.1.1'
-        commit: 'sha1-5f6978faf089d4d20b00c7766989d076bb2fc7f1'
+    'peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1':
+        ref: 'v8.1.3'
+        commit: 'sha1-3ffccacd46053766916f087ce41d627c0b8cf2d1'
         owner_id: 18365890
         repo_id: 197176365
-    'peter-evans/create-pull-request@v8.1.1':
+    'peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1':
         ref: 'v8.1.1'
         commit: 'sha1-5f6978faf089d4d20b00c7766989d076bb2fc7f1'
         owner_id: 18365890
@@ -119,19 +108,19 @@ dependencies:
         commit: 'sha1-26e5b7d197ebf60545ee9667bcbace0be11ccaec'
         owner_id: 210414
         repo_id: 231208785
-    'ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94':
-        ref: 'v1.336.0'
-        commit: 'sha1-de492cf36cbab201753d720ce4f4e336cd688c94'
+    'ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199':
+        ref: 'v1.338.0'
+        commit: 'sha1-b3aaceaef7e0ee231b499e7b5f49c03fc1d32199'
         owner_id: 210414
         repo_id: 231208785
-    'ruby/setup-ruby@v1.336.0':
-        ref: 'v1.336.0'
-        commit: 'sha1-de492cf36cbab201753d720ce4f4e336cd688c94'
+    'ruby/setup-ruby@v1.338.0':
+        ref: 'v1.338.0'
+        commit: 'sha1-b3aaceaef7e0ee231b499e7b5f49c03fc1d32199'
         owner_id: 210414
         repo_id: 231208785
-    'step-security/harden-runner@v2.22.3':
-        ref: 'v2.22.3'
-        commit: 'sha1-46b06cea07f9e64621fdf066ba77ac6915163d43'
+    'step-security/harden-runner@v2.22.4':
+        ref: 'v2.22.4'
+        commit: 'sha1-1d88384fd173af6ecb012dfd0264a306b711241a'
         owner_id: 88700172
         repo_id: 422287306
     'swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6':
