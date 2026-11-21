@@ -23,6 +23,10 @@
       "pinDigests": false
     },
     {
+      matchManagers: ['npm'],
+      minimumReleaseAge: '3 days',
+    },
+    {
       matchManagers: ['github-actions'],
       groupName: 'github actions',
       minimumReleaseAge: '7 days',
