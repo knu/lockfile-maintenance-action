@@ -2,7 +2,7 @@
   $schema: 'https://docs.renovatebot.com/renovate-schema.json',
   extends: ['config:recommended', 'helpers:pinGitHubActionDigests'],
   timezone: 'Asia/Tokyo',
-  schedule: ['after 9am on friday', 'before 6pm on friday'],
+  schedule: ['* 9-17 * * *'],
   labels: ['dependencies'],
   // Lockfiles are maintained by lockfile-maintenance-action.
   lockFileMaintenance: { enabled: false },
@@ -29,7 +29,24 @@
     {
       matchManagers: ['github-actions'],
       groupName: 'github actions',
+      minimumReleaseAge: '3 days',
+      minimumReleaseAgeBuffer: null,
+    },
+    {
+      matchManagers: ['github-actions'],
+      matchPackageNames: [
+        'actions/checkout',
+        'peter-evans/create-pull-request',
+        'step-security/harden-runner',
+      ],
+      groupName: 'github actions with credential access',
       minimumReleaseAge: '7 days',
+    },
+    {
+      matchManagers: ['github-actions'],
+      matchPackageNames: ['ruby/setup-ruby'],
+      groupName: null,
+      minimumReleaseAge: '24 hours',
     },
   ],
 }
