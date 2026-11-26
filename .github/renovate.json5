@@ -1,13 +1,16 @@
 {
   $schema: 'https://docs.renovatebot.com/renovate-schema.json',
   extends: ['config:recommended', 'helpers:pinGitHubActionDigests'],
+  baseBranchPatterns: ['$default', 'v1'],
   timezone: 'Asia/Tokyo',
   schedule: ['* 9-17 * * *'],
+  prHourlyLimit: 5,
   labels: ['dependencies'],
   // Lockfiles are maintained by lockfile-maintenance-action.
   lockFileMaintenance: { enabled: false },
   packageRules: [
     {
+      matchBaseBranches: ['main'],
       matchManagers: ['github-actions'],
       matchDepTypes: ['action'],
       matchFileNames: [
@@ -43,6 +46,11 @@
       matchPackageNames: ['ruby/setup-ruby'],
       groupName: null,
       minimumReleaseAge: '24 hours',
+    },
+    {
+      matchBaseBranches: ['v1'],
+      branchPrefixOld: 'renovate/v1-',
+      dependencyDashboardApproval: true,
     },
   ],
 }
