@@ -8,19 +8,15 @@
   lockFileMaintenance: { enabled: false },
   packageRules: [
     {
-      "matchManagers": [
-        "github-actions"
+      matchManagers: ['github-actions'],
+      matchDepTypes: ['action'],
+      matchFileNames: [
+        '.github/workflows/ci.yml',
+        '.github/workflows/lockfile-maintenance.yml',
+        '.github/workflows/maintenance.yml',
+        '.github/workflows/actions-lock.yml',
       ],
-      "matchDepTypes": [
-        "action"
-      ],
-      "matchFileNames": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/lockfile-maintenance.yml",
-        ".github/workflows/maintenance.yml",
-        ".github/workflows/actions-lock.yml"
-      ],
-      "pinDigests": false
+      pinDigests: false,
     },
     {
       matchManagers: ['npm'],
