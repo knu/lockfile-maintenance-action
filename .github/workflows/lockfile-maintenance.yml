@@ -3,7 +3,7 @@ name: Lockfile maintenance
 on:
   workflow_dispatch: {}
   schedule:
-    - cron: '0 0 * * 5' # Friday 09:00 JST
+    - cron: '17 0 * * *' # Daily at 09:17 JST
 
 permissions:
   contents: read
@@ -33,5 +33,5 @@ jobs:
         uses: knu/lockfile-maintenance-action@v2
         with:
           files: /.github/workflows/actions.lock
-          minimum-release-age: 7 days
+          minimum-release-age: 3 days
           branch: automation/actions-lock-maintenance
