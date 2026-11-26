@@ -111,7 +111,7 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: '24'
         package-manager-cache: false
@@ -172,7 +172,7 @@ runs:
 
     - name: Set up uv
       if: steps.tools.outputs.uv == 'true' && inputs.setup-uv == 'true'
-      uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
       with:
         version: ${{ inputs.uv-version }}
         enable-cache: false
@@ -187,7 +187,7 @@ runs:
 
     - name: Set up rustup
       if: steps.tools.outputs.rustup == 'true' && inputs.setup-rustup == 'true'
-      uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
+      uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
       env:
         RUSTUP_TOOLCHAIN: ${{ steps.tools.outputs.cargo-toolchain }}
       with:
